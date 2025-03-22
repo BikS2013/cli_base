@@ -6,7 +6,7 @@ Handles configuration file operations.
 import json
 import click
 from typing import Optional, Dict, Any
-from ..utils.config import ConfigManager
+from ..utils.context import ContextManager
 from ..utils.formatting import OutputFormatter
 
 
@@ -22,7 +22,9 @@ def config_group():
 @click.option("--file", "file_path", type=str, help="Use named configuration file.")
 def show_config(scope: str, file_path: Optional[str] = None):
     """Display configuration content."""
-    config_manager = ConfigManager()
+    # Update context with command-specific arguments
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     # Validate scope + file_path combination
     if scope is None and file_path is None:
@@ -31,7 +33,8 @@ def show_config(scope: str, file_path: Optional[str] = None):
         scope = "file"
     
     try:
-        config = config_manager.read_config(scope, file_path)
+        # Get configuration based on scope
+        config = rt.get_config(scope)
         OutputFormatter.print_json(config, f"{scope.capitalize()} Configuration")
     except (FileNotFoundError, ValueError) as e:
         OutputFormatter.print_error(str(e))
@@ -43,12 +46,14 @@ def show_config(scope: str, file_path: Optional[str] = None):
 @click.option("--file", "file_path", type=str, help="Use named configuration file.")
 def save_config(scope: str, file_path: Optional[str] = None):
     """Save current parameters to configuration."""
-    config_manager = ConfigManager()
+    # Get runtime settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     # For demonstration, we're just using the default config
     # In a real implementation, this would use current parameters from context
     try:
-        config_manager.write_config(config_manager.DEFAULT_CONFIG, scope, file_path)
+        rt.save_config(rt.DEFAULT_CONFIG, scope)
         OutputFormatter.print_success(f"Configuration saved to {scope} config.")
     except (ValueError, IOError) as e:
         OutputFormatter.print_error(str(e))
@@ -61,7 +66,9 @@ def save_config(scope: str, file_path: Optional[str] = None):
 @click.argument("update_json", required=True)
 def update_config(scope: str, update_json: str, file_path: Optional[str] = None):
     """Update configuration with current parameters."""
-    config_manager = ConfigManager()
+    # Get runtime settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     try:
         # Parse update JSON
@@ -72,7 +79,7 @@ def update_config(scope: str, update_json: str, file_path: Optional[str] = None)
             scope = "file"
         
         # Update config
-        config_manager.update_config(updates, scope, file_path)
+        rt.update_config(updates, scope)
         OutputFormatter.print_success(f"Configuration updated in {scope} config.")
     except json.JSONDecodeError:
         OutputFormatter.print_error("Invalid JSON format for update.")
@@ -87,7 +94,9 @@ def update_config(scope: str, update_json: str, file_path: Optional[str] = None)
 @click.argument("config_json", required=True)
 def replace_config(scope: str, config_json: str, file_path: Optional[str] = None):
     """Replace entire configuration with current parameters."""
-    config_manager = ConfigManager()
+    # Get runtime settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     try:
         # Parse replacement JSON
@@ -98,7 +107,7 @@ def replace_config(scope: str, config_json: str, file_path: Optional[str] = None
             scope = "file"
         
         # Replace config
-        config_manager.write_config(new_config, scope, file_path)
+        rt.save_config(new_config, scope)
         OutputFormatter.print_success(f"Configuration replaced in {scope} config.")
     except json.JSONDecodeError:
         OutputFormatter.print_error("Invalid JSON format for configuration.")
@@ -116,7 +125,9 @@ def replace_config(scope: str, config_json: str, file_path: Optional[str] = None
 @click.option("--replace", is_flag=True, help="Replace entire configuration instead of merging.")
 def import_config(from_scope: str, from_file: Optional[str], to_scope: str, to_file: Optional[str], replace: bool):
     """Import configuration from another file."""
-    config_manager = ConfigManager()
+    # Get runtime settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     try:
         # Determine source and destination configurations
@@ -126,21 +137,45 @@ def import_config(from_scope: str, from_file: Optional[str], to_scope: str, to_f
         if to_scope is None and to_file is None:
             raise ValueError("Must specify a destination configuration (--to-global, --to-local, or --to-file).")
         
-        # Load source configuration
-        source_scope = from_scope if from_scope else "file"
-        source_config = config_manager.read_config(source_scope, from_file)
-        
-        # Load destination configuration
-        dest_scope = to_scope if to_scope else "file"
-        
-        if replace:
-            # Replace destination with source
-            config_manager.write_config(source_config, dest_scope, to_file)
+        # Set up CLI args for source
+        if from_file:
+            # Initialize a temporary RTSettings for the from-file
+            temp_settings = ContextManager.initialize({"file_path": from_file})
+            source_scope = "file"
+            source_config = temp_settings.settings.get_config("file")
         else:
-            # Merge source into destination
-            dest_config = config_manager.read_config(dest_scope, to_file)
-            merged_config = config_manager._deep_merge(dest_config, source_config)
-            config_manager.write_config(merged_config, dest_scope, to_file)
+            source_scope = from_scope
+            source_config = rt.get_config(source_scope)
+        
+        # Set up destination 
+        if to_file:
+            # Update the temporary settings for the to-file
+            temp_settings = ContextManager.initialize({"file_path": to_file})
+            dest_scope = "file"
+            
+            if replace:
+                # Replace destination with source
+                temp_settings.settings.save_config(source_config, dest_scope)
+            else:
+                # Merge source into destination
+                try:
+                    dest_config = temp_settings.settings.get_config(dest_scope)
+                    merged_config = rt._deep_merge(dest_config, source_config)
+                    temp_settings.settings.save_config(merged_config, dest_scope)
+                except FileNotFoundError:
+                    # If destination file doesn't exist, create it with source config
+                    temp_settings.settings.save_config(source_config, dest_scope)
+        else:
+            dest_scope = to_scope
+            
+            if replace:
+                # Replace destination with source
+                rt.save_config(source_config, dest_scope)
+            else:
+                # Merge source into destination
+                dest_config = rt.get_config(dest_scope)
+                merged_config = rt._deep_merge(dest_config, source_config)
+                rt.save_config(merged_config, dest_scope)
         
         OutputFormatter.print_success("Configuration imported successfully.")
     except (ValueError, IOError, FileNotFoundError) as e:
@@ -154,7 +189,9 @@ def import_config(from_scope: str, from_file: Optional[str], to_scope: str, to_f
 @click.option("--to-file", "to_file", type=str, required=True, help="Export to named configuration file.")
 def export_config(from_scope: str, from_file: Optional[str], to_file: str):
     """Export configuration to another file."""
-    config_manager = ConfigManager()
+    # Get runtime settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     try:
         # Determine source configuration
@@ -162,8 +199,12 @@ def export_config(from_scope: str, from_file: Optional[str], to_file: str):
             from_scope = "local"  # Default to local if not specified
         
         # Load source configuration
-        source_scope = from_scope if from_scope else "file"
-        source_config = config_manager.read_config(source_scope, from_file)
+        if from_file:
+            # Initialize a temporary RTSettings for the from-file
+            temp_settings = ContextManager.initialize({"file_path": from_file})
+            source_config = temp_settings.settings.get_config("file")
+        else:
+            source_config = rt.get_config(from_scope)
         
         # Write to destination file
         with open(to_file, 'w') as f:
@@ -181,7 +222,9 @@ def export_config(from_scope: str, from_file: Optional[str], to_file: str):
 @click.confirmation_option(prompt="Are you sure you want to reset the configuration?")
 def reset_config(scope: str, file_path: Optional[str] = None):
     """Reset configuration to defaults."""
-    config_manager = ConfigManager()
+    # Get runtime settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     try:
         # Validate scope + file_path combination
@@ -191,7 +234,7 @@ def reset_config(scope: str, file_path: Optional[str] = None):
             scope = "file"
         
         # Reset config to defaults
-        config_manager.write_config(config_manager.DEFAULT_CONFIG, scope, file_path)
+        rt.save_config(rt.DEFAULT_CONFIG, scope)
         OutputFormatter.print_success(f"{scope.capitalize()} configuration reset to defaults.")
     except (ValueError, IOError) as e:
         OutputFormatter.print_error(str(e))
@@ -203,7 +246,9 @@ def reset_config(scope: str, file_path: Optional[str] = None):
 @click.option("--file", "file_path", type=str, help="Generate from named configuration file.")
 def generate_config(scope: str, file_path: Optional[str] = None):
     """Generate command-line instructions based on configuration."""
-    config_manager = ConfigManager()
+    # Get runtime settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
     
     try:
         # Validate scope + file_path combination
@@ -213,7 +258,7 @@ def generate_config(scope: str, file_path: Optional[str] = None):
             scope = "file"
         
         # Read configuration
-        config = config_manager.read_config(scope, file_path)
+        config = rt.get_config(scope)
         
         # Generate command-line instructions for LLM profiles
         if "profiles" in config and "llm" in config["profiles"]:

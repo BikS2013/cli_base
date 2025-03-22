@@ -7,6 +7,7 @@ import click
 from cli_base.commands.config_cmd import config_group
 from cli_base.commands.llm_cmd import llm_group
 from cli_base.commands.schema_cmd import schema_group
+from cli_base.utils.context import ContextManager
 from cli_base.utils.formatting import OutputFormatter
 
 
@@ -20,12 +21,18 @@ def cli(verbose: bool, quiet: bool):
     
     Use commands like 'config', 'llm', and 'schema' to interact with the tool.
     """
-    # Store global options in click context
-    ctx = click.get_current_context()
-    ctx.obj = {
+    # Initialize runtime settings with global CLI arguments
+    cli_args = {
         "verbose": verbose,
         "quiet": quiet
     }
+    
+    try:
+        # Try to get existing context manager instance
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        # Initialize new context manager
+        ctx = ContextManager.initialize(cli_args)
 
 
 # Add command groups

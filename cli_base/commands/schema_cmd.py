@@ -4,6 +4,7 @@ Provides a visual representation of the command structure.
 """
 
 import click
+from ..utils.context import ContextManager
 from ..utils.formatting import OutputFormatter
 
 
@@ -94,6 +95,12 @@ def schema_group():
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
 def show_schema(command: str, verbose: bool):
     """Show schema for a specific command or the entire CLI."""
+    # Ensure context is initialized
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize({"verbose": verbose})
+    
     if command and command in SCHEMA_DATA:
         # Show schema for specific command
         command_schema = {command: SCHEMA_DATA[command]}

@@ -6,7 +6,7 @@ Handles LLM profile management.
 import json
 import click
 from typing import Optional, Dict, Any
-from ..utils.config import ConfigManager
+from ..utils.context import ContextManager
 from ..utils.profiles import LLMProfileManager
 from ..utils.formatting import OutputFormatter
 
@@ -44,8 +44,20 @@ def create_profile(
     json_input: Optional[str]
 ):
     """Create a new LLM profile."""
-    config_manager = ConfigManager()
-    llm_manager = LLMProfileManager(config_manager)
+    # Update runtime context with command-specific arguments
+    cli_args = {
+        "scope": scope,
+        "file_path": file_path
+    }
+    
+    # Initialize or get context manager
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize(cli_args)
+    
+    # Create LLM profile manager
+    llm_manager = LLMProfileManager()
     
     try:
         # Process JSON input if provided
@@ -75,7 +87,7 @@ def create_profile(
             scope = "file"
         
         # Create profile
-        created_profile = llm_manager.create_profile(profile_data, scope, file_path)
+        created_profile = llm_manager.create_profile(profile_data, scope)
         OutputFormatter.print_success(f"LLM profile '{created_profile['name']}' created successfully.")
         OutputFormatter.print_json(created_profile, "Profile Details")
     except (ValueError, json.JSONDecodeError) as e:
@@ -89,8 +101,20 @@ def create_profile(
 @click.option("--format", "output_format", type=click.Choice(["json", "table"]), default="table", help="Output format")
 def list_profiles(scope: str, file_path: Optional[str], output_format: str):
     """List available LLM profiles."""
-    config_manager = ConfigManager()
-    llm_manager = LLMProfileManager(config_manager)
+    # Update runtime context with command-specific arguments
+    cli_args = {
+        "scope": scope,
+        "file_path": file_path
+    }
+    
+    # Initialize or get context manager
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize(cli_args)
+    
+    # Create LLM profile manager
+    llm_manager = LLMProfileManager()
     
     try:
         # Validate scope + file_path combination
@@ -98,14 +122,14 @@ def list_profiles(scope: str, file_path: Optional[str], output_format: str):
             scope = "file"
         
         # List profiles
-        profiles = llm_manager.list_profiles(scope, file_path)
+        profiles = llm_manager.list_profiles(scope)
         
         if not profiles:
             OutputFormatter.print_info(f"No LLM profiles found in {scope} configuration.")
             return
         
         # Get default profile
-        default_profile = config_manager.get_default_profile("llm", scope, file_path)
+        default_profile = llm_manager.get_default_profile()
         
         # Format output
         if output_format == "json":
@@ -141,8 +165,20 @@ def list_profiles(scope: str, file_path: Optional[str], output_format: str):
 @click.option("--format", "output_format", type=click.Choice(["json", "table"]), default="json", help="Output format")
 def show_profile(name: str, scope: str, file_path: Optional[str], output_format: str):
     """Show LLM profile details."""
-    config_manager = ConfigManager()
-    llm_manager = LLMProfileManager(config_manager)
+    # Update runtime context with command-specific arguments
+    cli_args = {
+        "scope": scope,
+        "file_path": file_path
+    }
+    
+    # Initialize or get context manager
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize(cli_args)
+    
+    # Create LLM profile manager
+    llm_manager = LLMProfileManager()
     
     try:
         # Validate scope + file_path combination
@@ -150,24 +186,14 @@ def show_profile(name: str, scope: str, file_path: Optional[str], output_format:
             scope = "file"
         
         # Get profile
-        profile = llm_manager.get_profile(name, scope, file_path)
+        profile = llm_manager.get_profile_from_scope(name, scope)
         
         # Format output
         if output_format == "json":
             OutputFormatter.print_json(profile, f"LLM Profile: {name}")
         else:  # table format
-            # Prepare data for table
-            table_data = [{
-                "Property": key,
-                "Value": str(value)
-            } for key, value in profile.items()]
-            
-            # Display table
-            OutputFormatter.print_table(
-                table_data,
-                ["Property", "Value"],
-                f"LLM Profile: {name}"
-            )
+            # Use our special profile formatter
+            OutputFormatter.print_profile(profile, name)
     except (ValueError, FileNotFoundError) as e:
         OutputFormatter.print_error(str(e))
 
@@ -199,8 +225,20 @@ def edit_profile(
     json_input: Optional[str]
 ):
     """Edit an existing LLM profile."""
-    config_manager = ConfigManager()
-    llm_manager = LLMProfileManager(config_manager)
+    # Update runtime context with command-specific arguments
+    cli_args = {
+        "scope": scope,
+        "file_path": file_path
+    }
+    
+    # Initialize or get context manager
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize(cli_args)
+    
+    # Create LLM profile manager
+    llm_manager = LLMProfileManager()
     
     try:
         # Process JSON input if provided
@@ -234,7 +272,7 @@ def edit_profile(
             scope = "file"
         
         # Edit profile
-        updated_profile = llm_manager.edit_profile(name, updates, scope, file_path)
+        updated_profile = llm_manager.edit_profile(name, updates, scope)
         OutputFormatter.print_success(f"LLM profile '{name}' updated successfully.")
         OutputFormatter.print_json(updated_profile, "Updated Profile")
     except (ValueError, json.JSONDecodeError, FileNotFoundError) as e:
@@ -249,8 +287,20 @@ def edit_profile(
 @click.confirmation_option(prompt="Are you sure you want to delete this profile?")
 def delete_profile(name: str, scope: str, file_path: Optional[str]):
     """Delete an LLM profile."""
-    config_manager = ConfigManager()
-    llm_manager = LLMProfileManager(config_manager)
+    # Update runtime context with command-specific arguments
+    cli_args = {
+        "scope": scope,
+        "file_path": file_path
+    }
+    
+    # Initialize or get context manager
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize(cli_args)
+    
+    # Create LLM profile manager
+    llm_manager = LLMProfileManager()
     
     try:
         # Validate scope + file_path combination
@@ -258,7 +308,7 @@ def delete_profile(name: str, scope: str, file_path: Optional[str]):
             scope = "file"
         
         # Delete profile
-        llm_manager.delete_profile(name, scope, file_path)
+        llm_manager.delete_profile(name, scope)
         OutputFormatter.print_success(f"LLM profile '{name}' deleted successfully.")
     except (ValueError, FileNotFoundError) as e:
         OutputFormatter.print_error(str(e))
@@ -271,8 +321,20 @@ def delete_profile(name: str, scope: str, file_path: Optional[str]):
 @click.option("--file", "file_path", type=str, help="Set as default in named configuration file.")
 def use_profile(name: str, scope: str, file_path: Optional[str]):
     """Use a specific LLM profile as default."""
-    config_manager = ConfigManager()
-    llm_manager = LLMProfileManager(config_manager)
+    # Update runtime context with command-specific arguments
+    cli_args = {
+        "scope": scope,
+        "file_path": file_path
+    }
+    
+    # Initialize or get context manager
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize(cli_args)
+    
+    # Create LLM profile manager
+    llm_manager = LLMProfileManager()
     
     try:
         # Validate scope + file_path combination
@@ -280,7 +342,7 @@ def use_profile(name: str, scope: str, file_path: Optional[str]):
             scope = "file"
         
         # Set as default profile
-        llm_manager.use_profile(name, scope, file_path)
+        llm_manager.use_profile(name, scope)
         OutputFormatter.print_success(f"LLM profile '{name}' set as default in {scope} configuration.")
     except (ValueError, FileNotFoundError) as e:
         OutputFormatter.print_error(str(e))

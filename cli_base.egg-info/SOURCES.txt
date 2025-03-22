@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 cli_base/__init__.py
+cli_base/main.py
 cli_base.egg-info/PKG-INFO
 cli_base.egg-info/SOURCES.txt
 cli_base.egg-info/dependency_links.txt
@@ -13,5 +14,7 @@ cli_base/commands/llm_cmd.py
 cli_base/commands/schema_cmd.py
 cli_base/utils/__init__.py
 cli_base/utils/config.py
+cli_base/utils/context.py
 cli_base/utils/formatting.py
 cli_base/utils/profiles.py
+cli_base/utils/rtsettings.py
