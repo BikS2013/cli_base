@@ -1,0 +1,15 @@
+[project]
+name = "cli-base"
+version = "0.1.0"
+description = "Universal CLI template with standardized commands, profiles, and configuration management"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "python-dotenv>=1.0.1",
+    "click>=8.1.7",
+    "rich>=13.7.0",
+    "pyyaml>=6.0.1",
+]
+
+[project.scripts]
+cli-tool = "cli_base.main:cli"

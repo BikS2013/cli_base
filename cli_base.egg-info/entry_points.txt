@@ -1,0 +1,2 @@
+[console_scripts]
+cli-tool = cli_base.main:cli
