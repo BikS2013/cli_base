@@ -39,3 +39,10 @@ class ContextManager:
         if self._settings is None:
             raise RuntimeError("Runtime settings not initialized.")
         return self._settings
+    
+def _initialize_context(cli_args: Dict[str, Any]) -> ContextManager:
+    """Initialize or get the context manager instance."""
+    try:
+        return ContextManager.get_instance()
+    except RuntimeError:
+        return ContextManager.initialize(cli_args)

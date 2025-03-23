@@ -118,13 +118,12 @@ class OutputFormatter:
                 style = "white"
             
             table.add_column(column, style=style)
-        
         # Add rows with appropriate styling
         for row in data:
             row_values = []
             for col in columns:
                 value = str(row.get(col, ""))
-                
+                #print( f"from row: {row} and col: {col} the value is: {value}")
                 # Special styling for the "Default" column with a checkmark
                 if col == "Default" and value == "✓":
                     value = f"[default]{value}[/default]"

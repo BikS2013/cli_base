@@ -261,6 +261,242 @@ def create_profile(
 
 This approach provides better type checking while still allowing for the flexible structure you requested.
 
+## Extending the Generic Approach to Edit Profile Command
+
+The `edit_profile` command can also benefit from the same generic approach. Like the `create_profile` command, it handles many profile parameters and would be more maintainable with a more generic structure.
+
+### Current Edit Profile Command
+
+```python
+@llm_group.command(name="edit")
+@click.option("--name", type=str, required=True, help="Profile name")
+@click.option("--provider", type=str, help="LLM provider")
+@click.option("--model", type=str, help="Model name")
+@click.option("--deployment", type=str, help="Deployment name")
+@click.option("--api-key", type=str, help="API key")
+@click.option("--base-url", type=str, help="Base URL for API")
+@click.option("--api-version", type=str, help="API version")
+@click.option("--temperature", type=float, help="Temperature (0.0-1.0)")
+@click.option("--global", "scope", flag_value="global", help="Edit in global configuration.")
+@click.option("--local", "scope", flag_value="local", default=True, help="Edit in local configuration.")
+@click.option("--file", "file_path", type=str, help="Edit in named configuration file.")
+@click.argument("json_input", required=False)
+def edit_profile(
+    name: str,
+    provider: Optional[str],
+    model: Optional[str],
+    deployment: Optional[str],
+    api_key: Optional[str],
+    base_url: Optional[str],
+    api_version: Optional[str],
+    temperature: Optional[float],
+    scope: str,
+    file_path: Optional[str],
+    json_input: Optional[str]
+):
+    """Edit an existing LLM profile."""
+    # ... implementation ...
+```
+
+### Refactored Edit Profile Command with Generic Parameters
+
+```python
+@llm_group.command(name="edit")
+@click.option("--name", type=str, required=True, help="Profile name")
+@add_profile_options  # Reuse the same decorator we created for create_profile
+@click.option("--global", "scope", flag_value="global", help="Edit in global configuration.")
+@click.option("--local", "scope", flag_value="local", default=True, help="Edit in local configuration.")
+@click.option("--file", "file_path", type=str, help="Edit in named configuration file.")
+@click.argument("json_input", required=False)
+def edit_profile(name: str, json_input: Optional[str], **kwargs):
+    """Edit an existing LLM profile."""
+    # Extract scope parameters
+    scope_params = {
+        "scope": kwargs.pop("scope", None),
+        "file_path": kwargs.pop("file_path", None)
+    }
+    
+    # Initialize context and LLM manager
+    ctx = _initialize_context(scope_params)
+    llm_manager = LLMProfileManager()
+    
+    try:
+        # Process parameters (from JSON or command-line args)
+        if json_input:
+            updates = EditProfileParameterProcessor.from_json(json_input, name)
+        else:
+            # Include the name parameter in the kwargs for processing
+            kwargs["name"] = name
+            # kwargs now contains all profile-specific parameters
+            updates = EditProfileParameterProcessor.from_args(kwargs)
+        
+        # Normalize scope
+        scope = ProfileParameterProcessor.validate_scope(
+            scope_params["scope"], scope_params["file_path"]
+        )
+        
+        # Edit profile
+        updated_profile = llm_manager.edit_profile(name, updates, scope)
+        OutputFormatter.print_success(f"LLM profile '{name}' updated successfully.")
+        OutputFormatter.print_json(updated_profile, "Updated Profile")
+    except (ValueError, json.JSONDecodeError, FileNotFoundError) as e:
+        OutputFormatter.print_error(str(e))
+```
+
+### Adding the Edit Profile Parameter Processor
+
+```python
+class EditProfileParameterProcessor(ProfileParameterProcessor):
+    """Process parameters for profile editing."""
+    
+    @classmethod
+    def from_args(cls, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Process parameters from command-line arguments."""
+        # Filter out None values to only update provided fields
+        updates = {k: v for k, v in args.items() if v is not None}
+        
+        # Ensure name is included
+        if "name" not in updates:
+            raise ValueError("Profile name is required for editing")
+            
+        return cls.process_params(updates)
+    
+    @classmethod
+    def from_json(cls, json_str: str, profile_name: str) -> Dict[str, Any]:
+        """Process parameters from JSON input with a required profile name."""
+        try:
+            updates = json.loads(json_str)
+            
+            # Ensure name is preserved if already in the JSON
+            if "name" not in updates:
+                updates["name"] = profile_name
+                
+            return cls.process_params(updates)
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON format")
+```
+
+### Alternative with TypedDict for Edit Profile
+
+```python
+@llm_group.command(name="edit")
+@click.option("--name", type=str, required=True, help="Profile name")
+# ... other profile options
+@click.option("--global", "scope", flag_value="global", help="Edit in global configuration.")
+@click.option("--local", "scope", flag_value="local", default=True, help="Edit in local configuration.")
+@click.option("--file", "file_path", type=str, help="Edit in named configuration file.")
+@click.argument("json_input", required=False)
+def edit_profile(
+    name: str,
+    json_input: Optional[str] = None,
+    scope: Optional[str] = None,
+    file_path: Optional[str] = None,
+    **profileargs
+):
+    """Edit an existing LLM profile."""
+    # Initialize context and LLM manager
+    ctx = _initialize_context({"scope": scope, "file_path": file_path})
+    llm_manager = LLMProfileManager()
+    
+    try:
+        if json_input:
+            updates = json.loads(json_input)
+            # Ensure name is preserved
+            if "name" not in updates:
+                updates["name"] = name
+        else:
+            # Type hint with our TypedDict
+            profile_updates: LLMProfileParams = {"name": name}
+            
+            # Add all non-None values from profileargs
+            for key, value in profileargs.items():
+                if value is not None:
+                    profile_updates[key] = value
+        
+        # Normalize scope
+        scope = ProfileParameterProcessor.validate_scope(scope, file_path)
+        
+        # Edit profile
+        updated_profile = llm_manager.edit_profile(name, profile_updates, scope)
+        OutputFormatter.print_success(f"LLM profile '{name}' updated successfully.")
+        OutputFormatter.print_json(updated_profile, "Updated Profile")
+    except (ValueError, json.JSONDecodeError, FileNotFoundError) as e:
+        OutputFormatter.print_error(str(e))
+```
+
+## Unifying Profile Command Parameters
+
+To further improve code organization and reduce duplication, we can create a common parametrization function for all profile-related commands:
+
+```python
+def parametrize_profile_command(command_func, require_name=False):
+    """
+    Apply all profile-related parameters to a Click command function.
+    
+    Args:
+        command_func: The Click command function to parametrize
+        require_name: Whether the name parameter is required
+    
+    Returns:
+        The parametrized Click command function
+    """
+    # Add name parameter with appropriate required setting
+    command_func = click.option(
+        "--name", 
+        type=str, 
+        required=require_name,
+        help="Profile name"
+    )(command_func)
+    
+    # Add other profile parameters
+    for param in PROFILE_PARAMS:
+        if param["name"] != "name":  # Skip name as we've already added it
+            command_func = click.option(
+                f"--{param['name']}", 
+                type=param['type'], 
+                help=param['help']
+            )(command_func)
+    
+    # Add scope parameters
+    command_func = click.option(
+        "--global", "scope", flag_value="global", 
+        help="Use global configuration."
+    )(command_func)
+    
+    command_func = click.option(
+        "--local", "scope", flag_value="local", default=True,
+        help="Use local configuration."
+    )(command_func)
+    
+    command_func = click.option(
+        "--file", "file_path", type=str,
+        help="Use named configuration file."
+    )(command_func)
+    
+    # Add JSON input argument
+    command_func = click.argument("json_input", required=False)(command_func)
+    
+    return command_func
+```
+
+Then we can simplify both command definitions:
+
+```python
+@llm_group.command(name="create")
+@parametrize_profile_command
+def create_profile(json_input: Optional[str] = None, **kwargs):
+    """Create a new LLM profile."""
+    # Implementation using kwargs...
+
+@llm_group.command(name="edit")
+@parametrize_profile_command(require_name=True)
+def edit_profile(json_input: Optional[str] = None, **kwargs):
+    """Edit an existing LLM profile."""
+    # Implementation using kwargs...
+```
+
+This unified approach ensures consistent parameter handling across commands and makes adding new profile commands much easier in the future.
+
 ### 4. Helper Functions
 
 ```python

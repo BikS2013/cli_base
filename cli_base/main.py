@@ -5,7 +5,7 @@ Universal CLI template with standardized commands, profiles, and configuration m
 
 import click
 from cli_base.commands.config_cmd import config_group
-from cli_base.commands.llm_cmd import llm_group
+from cli_base.extensibility.llm_cmd import llm_group
 from cli_base.commands.schema_cmd import schema_group
 from cli_base.utils.context import ContextManager
 from cli_base.utils.formatting import OutputFormatter
