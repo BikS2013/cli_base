@@ -10,6 +10,13 @@ from cli_base.commands.schema_cmd import schema_group
 from cli_base.utils.context import ContextManager
 from cli_base.utils.formatting import OutputFormatter
 
+# Import the generate command for LLM interaction
+try:
+    from cli_base.llm.commands import generate_command
+    HAS_LANGCHAIN = True
+except ImportError:
+    HAS_LANGCHAIN = False
+
 
 @click.group()
 @click.version_option()
@@ -39,6 +46,10 @@ def cli(verbose: bool, quiet: bool):
 cli.add_command(config_group)
 cli.add_command(llm_group)
 cli.add_command(schema_group)
+
+# Add LLM generate command if LangChain is available
+if HAS_LANGCHAIN:
+    cli.add_command(generate_command)
 # Add other profile command groups here
 
 # Now register all commands in the CommandRegistry
