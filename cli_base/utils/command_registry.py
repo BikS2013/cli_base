@@ -30,25 +30,25 @@ class CommandRegistry:
         
     def register_command(self, 
                           command_name: str, 
-                          command_group: click.Group, 
+                          command: Union[click.Group, click.Command], 
                           schema: Dict[str, Any]) -> None:
         """
-        Register a command group and its schema.
+        Register a command/command group and its schema.
         
         Args:
             command_name: The name of the command
-            command_group: The Click command group object
+            command: The Click command or command group object
             schema: Schema information for the command
         """
-        self._commands[command_name] = command_group
+        self._commands[command_name] = command
         self._schemas[command_name] = schema
     
-    def get_all_commands(self) -> Dict[str, click.Group]:
-        """Get all registered command groups."""
+    def get_all_commands(self) -> Dict[str, Union[click.Group, click.Command]]:
+        """Get all registered commands."""
         return self._commands
     
-    def get_command(self, name: str) -> Optional[click.Group]:
-        """Get a command group by name."""
+    def get_command(self, name: str) -> Optional[Union[click.Group, click.Command]]:
+        """Get a command by name."""
         return self._commands.get(name)
     
     def get_schema(self, name: str = None) -> Dict[str, Any]:
@@ -65,21 +65,21 @@ class CommandRegistry:
             return {name: self._schemas.get(name, {})}
         return self._schemas
     
-    def extract_schema_from_command(self, command_name: str, command_group: click.Group) -> Dict[str, Any]:
+    def extract_schema_from_command(self, command_name: str, command: Union[click.Group, click.Command]) -> Dict[str, Any]:
         """
-        Extract schema information from a command group.
+        Extract schema information from a command or command group.
         
         This allows automatic schema generation for dynamically created commands.
         
         Args:
             command_name: The name of the command
-            command_group: The Click command group object
+            command: The Click command or command group object
             
         Returns:
             Schema dictionary for the command
         """
         # Get help text from command docstring
-        help_text = command_group.help or f"Manage {command_name}"
+        help_text = command.help or f"Manage {command_name}"
         
         # Initialize schema
         schema = {
@@ -87,19 +87,44 @@ class CommandRegistry:
             "subcommands": {}
         }
         
-        # Extract subcommands
-        for subcmd_name, subcmd in command_group.commands.items():
-            # Get subcommand help text
-            subcmd_help = subcmd.help or f"{subcmd_name.capitalize()} {command_name}"
-            
-            # Initialize subcommand schema
-            subcmd_schema = {
-                "help": subcmd_help,
-                "options": {}
-            }
-            
-            # Extract parameters
-            for param in subcmd.params:
+        # Check if this is a command group or a simple command
+        if isinstance(command, click.Group) and hasattr(command, 'commands'):
+            # Extract subcommands
+            for subcmd_name, subcmd in command.commands.items():
+                # Get subcommand help text
+                subcmd_help = subcmd.help or f"{subcmd_name.capitalize()} {command_name}"
+                
+                # Initialize subcommand schema
+                subcmd_schema = {
+                    "help": subcmd_help,
+                    "options": {}
+                }
+                
+                # Extract parameters
+                for param in subcmd.params:
+                    if isinstance(param, click.Option):
+                        # Format option name
+                        names = param.opts
+                        if names:
+                            name = names[0]  # Use the first option name (usually the long form)
+                            # Add type hint for display
+                            type_hint = ""
+                            if param.type:
+                                if hasattr(param.type, 'name'):
+                                    type_hint = f"<{param.type.name.upper()}>"
+                                else:
+                                    type_hint = f"<{param.type.__name__.upper()}>"
+                            
+                            # Add formatted option to schema
+                            option_name = f"{name} {type_hint}" if type_hint else name
+                            subcmd_schema["options"][option_name] = param.help or ""
+                
+                # Add subcommand to schema
+                schema["subcommands"][subcmd_name] = subcmd_schema
+        else:
+            # For simple commands, add options directly to the main schema
+            options_schema = {}
+            for param in command.params:
                 if isinstance(param, click.Option):
                     # Format option name
                     names = param.opts
@@ -115,10 +140,10 @@ class CommandRegistry:
                         
                         # Add formatted option to schema
                         option_name = f"{name} {type_hint}" if type_hint else name
-                        subcmd_schema["options"][option_name] = param.help or ""
+                        options_schema[option_name] = param.help or ""
             
-            # Add subcommand to schema
-            schema["subcommands"][subcmd_name] = subcmd_schema
+            # Add options to the main schema
+            schema["options"] = options_schema
         
         return schema
     
@@ -133,8 +158,7 @@ class CommandRegistry:
             cli: The main Click CLI group
         """
         for cmd_name, cmd in cli.commands.items():
-            if isinstance(cmd, click.Group):
-                # Extract schema
-                schema = self.extract_schema_from_command(cmd_name, cmd)
-                # Register command
-                self.register_command(cmd_name, cmd, schema)
+            # Extract schema for both groups and simple commands
+            schema = self.extract_schema_from_command(cmd_name, cmd)
+            # Register command or command group
+            self.register_command(cmd_name, cmd, schema)

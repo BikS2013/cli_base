@@ -167,7 +167,7 @@ class OutputFormatter:
     @staticmethod
     def print_command_tree(commands: Dict[str, Any]) -> None:
         """Print a formatted command tree structure with vibrant colors."""
-        tree = Tree(f"[command]cli-tool[/command]", guide_style="blue")
+        tree = Tree(f"[command]cli_base[/command]", guide_style="blue")
         
         # Commands section
         cmd_section = tree.add(f"[section]COMMANDS[/section]")
@@ -177,7 +177,7 @@ class OutputFormatter:
             )
             
             # Add subcommands if any
-            if "subcommands" in cmd_info:
+            if "subcommands" in cmd_info and cmd_info["subcommands"]:
                 for subcmd_name, subcmd_info in cmd_info["subcommands"].items():
                     subcmd_node = cmd_node.add(
                         f"[subcommand]{subcmd_name}[/subcommand]            [value]{subcmd_info.get('help', '')}[/value]"
@@ -187,6 +187,11 @@ class OutputFormatter:
                     if "options" in subcmd_info:
                         for opt_name, opt_help in subcmd_info["options"].items():
                             subcmd_node.add(f"[option]{opt_name}[/option] [value]{opt_help}[/value]")
+            
+            # Add options for simple commands
+            if "options" in cmd_info:
+                for opt_name, opt_help in cmd_info["options"].items():
+                    cmd_node.add(f"[option]{opt_name}[/option] [value]{opt_help}[/value]")
         
         # Config scope flags section
         flags_section = tree.add(f"[section]CONFIG SCOPE FLAGS[/section]")
