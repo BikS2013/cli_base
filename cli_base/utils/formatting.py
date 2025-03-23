@@ -208,10 +208,17 @@ class OutputFormatter:
         console.print(tree)
     
     @staticmethod
-    def print_profile(profile: Dict[str, Any], name: str) -> None:
-        """Print an LLM profile with formatted output and color."""
+    def print_profile(profile: Dict[str, Any], name: str, profile_type: str = "LLM") -> None:
+        """
+        Print a profile with formatted output and color, masking sensitive fields.
+        
+        Args:
+            profile: The profile data to display
+            name: The name of the profile
+            profile_type: The type of profile (default: "LLM")
+        """
         title = Text()
-        title.append("LLM Profile: ", style="title")
+        title.append(f"{profile_type} Profile: ", style="title")
         title.append(name, style="highlight")
         
         console.print(title)
@@ -221,23 +228,43 @@ class OutputFormatter:
         table.add_column("Property", style="key")
         table.add_column("Value", style="value")
         
+        # Get sensitive field info
+        sensitive_fields = []
+        for key, param in [(p["name"], p) for p in getattr(profile, "_params", [])]:
+            if param.get("sensitive", False):
+                sensitive_fields.append(key)
+        
+        # Always consider api_key as sensitive
+        if "api_key" not in sensitive_fields:
+            sensitive_fields.append("api_key")
+        
         # Special formatting for different property types
         for key, value in profile.items():
+            if value is None:
+                continue
+                
             value_str = str(value)
             
+            # Mask sensitive fields
+            if key in sensitive_fields and value:
+                # Keep first 4 and last 4 chars, mask the rest with asterisks
+                if len(value_str) > 8:
+                    value_str = value_str[:4] + "*" * (len(value_str) - 8) + value_str[-4:]
+                else:
+                    value_str = "********"  # For very short values
+                value_style = "warning"
             # Color-code specific properties
-            if key == "name":
+            elif key == "name":
                 value_style = "highlight"
             elif key == "provider":
                 value_style = "subcommand"
             elif key == "model":
                 value_style = "info"
-            elif key == "api_key":
-                # Hide part of the API key for security
-                if value and len(value) > 8:
-                    value_str = value[:4] + "*" * (len(value) - 8) + value[-4:]
-                value_style = "warning"
             elif key == "temperature":
+                value_style = "command"
+            elif key == "max_tokens":
+                value_style = "highlight"
+            elif key in ["region", "project_id", "organization"]:
                 value_style = "command"
             else:
                 value_style = "value"
