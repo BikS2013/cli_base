@@ -1,6 +1,6 @@
 # Universal CLI Tool
 
-A comprehensive command-line interface template that provides standardized support for commands, subcommands, complex configurations, profiles management, and multi-level configuration files.
+A comprehensive command-line interface template that provides standardized support for commands, subcommands, complex configurations, profiles management, multi-level configuration files, and LLM integration via LangChain.
 
 ## Features
 
@@ -10,6 +10,9 @@ A comprehensive command-line interface template that provides standardized suppo
 - Flexible configuration file management
 - Colorful, readable output
 - Comprehensive help and schema documentation
+- Unified LLM support through LangChain integration
+- Support for multiple LLM providers (OpenAI, Anthropic, Google Gemini, Azure OpenAI, AWS Bedrock, and more)
+- Streamlined LLM profile management with environment variable support
 
 ## Installation
 
@@ -55,11 +58,15 @@ cli-tool config import --from-file "~/my-configs/special.json" --to-local
 
 ### LLM Profile Management
 
-Create and manage LLM profiles:
+Create and manage LLM profiles with support for multiple providers through LangChain:
 
 ```bash
 # Create a new LLM profile
 cli-tool llm create --name "gpt4-standard" --provider "openai" --model "gpt-4" --api-key "key123" --temperature 0.7 --global
+
+# Create profiles for other providers
+cli-tool llm create --name "claude-3" --provider "anthropic" --model "claude-3-sonnet" --api-key "key456" --temperature 0.7 --global
+cli-tool llm create --name "gemini-pro" --provider "google" --model "gemini-pro" --api-key "key789" --project-id "my-project" --global
 
 # List all LLM profiles
 cli-tool llm list --global
@@ -69,7 +76,12 @@ cli-tool llm show --name "gpt4-standard"
 
 # Set a profile as default
 cli-tool llm use --name "gpt4-standard"
+
+# Use profile with provider-specific parameters
+cli-tool llm create --name "azure-gpt" --provider "azure" --model "gpt-4" --api-key "key123" --deployment "my-deployment" --base-url "https://example.openai.azure.com" --api-version "2023-05-15" --global
 ```
+
+The CLI tool will automatically use API keys from environment variables if available (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.).
 
 ### Schema and Help
 
@@ -91,7 +103,18 @@ This CLI tool is built using:
 
 - [Click](https://click.palletsprojects.com/): For command-line interface creation
 - [Rich](https://rich.readthedocs.io/): For colorful terminal output
+- [LangChain](https://www.langchain.com/): For unified LLM provider integration
 - Python 3.11+
+
+### LangChain Integration
+
+The CLI tool uses LangChain to provide a unified interface for working with multiple LLM providers:
+
+- Supports numerous providers including OpenAI, Anthropic, Google, Azure, AWS Bedrock, Cohere, Mistral AI, and more
+- Handles provider-specific nuances and requirements
+- Provides structured prompt management, streaming support, and token counting
+- Simplifies error handling, retries, and timeouts
+- Reduces development effort by abstracting provider-specific implementations
 
 ## License
 
