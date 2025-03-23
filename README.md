@@ -96,3 +96,24 @@ This CLI tool is built using:
 ## License
 
 This project is licensed under the MIT License.
+
+
+## Use it as template for CLI tools 
+To use it as template for other CLI tools, you have to fork the repo.
+You can perform manually the various changes as are described in the tool?adaptation_guide.md or ask from an LLM to do it. 
+
+If you want to use **Claude Code** you can try the following command: 
+``` 
+I want you to read the tool_adaptation_guide and follow the instructions to rename the tool from cli-base to
+getPage without adding any additional logic.
+I don’t want you to install the package at all. 
+Just make the changes.
+``` 
+
+After the changes have been made you have to run 
+```bash 
+uv sync 
+source .venv/bin/activate
+uv pip install -e .
+``` 
+
