@@ -1,5 +1,16 @@
 import click
 
+#@click.option("--name", type=str, required=True, help="Profile name")
+def profile_name_option(command):
+    """Decorator to add profile name option to a command."""
+    command = click.option(
+        f"--name", 
+        type=str,
+        required=True,
+        help="Profile name"
+    )(command)
+    return command
+
 
 SCOPE_PARAMS = [
     {"name": "global", "func_param":"scope",  "flag_value": "global", "help": "Use global configuration"},
@@ -12,7 +23,7 @@ SCOPE_PARAMS = [
 # @click.option("--file", "file_path", type=str, help="Use named configuration file.")
 
 def scope_options(command):
-    """Decorator to add profile options to a command."""
+    """Decorator to add scope options to a command."""
     for param in SCOPE_PARAMS:
         command = click.option(
             f"--{param['name']}", 
@@ -22,4 +33,37 @@ def scope_options(command):
             default=param.get('default', None) if 'default' in param else None,
             help=param['help']
         )(command)
+    return command
+
+#@click.argument("json_input", required=False)
+def json_input_argument(command):
+    """Decorator to add json input option to a command."""
+    command = click.argument(
+        "json_input",
+        required=False
+    )(command)
+    return command
+
+#@click.option("--format", "output_format", type=click.Choice(["json", "table"]), default="table", help="Output format")
+
+def table_format_option(command):
+    """Decorator to add format option to a command."""
+    command = click.option(
+        f"--format", 
+        "output_format",
+        type=click.Choice(["json", "table"]),
+        default="table",
+        help="Output format"
+    )(command)
+    return command
+
+def json_format_option(command):
+    """Decorator to add format option to a command."""
+    command = click.option(
+        f"--format", 
+        "output_format",
+        type=click.Choice(["json", "table"]),
+        default="table",
+        help="Output format"
+    )(command)
     return command
