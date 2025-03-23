@@ -414,14 +414,25 @@ def export_data(output, format):
     # Implementation...
 ```
 
-## 3. Updating the Schema
+## 3. Updating the Schema System
 
-After adding new commands, update the schema information to include them:
+The schema system needs to be updated to work with your renamed tool. There are two possible approaches depending on your codebase's current implementation:
+
+### 3.1 Static Schema Definition
+
+If your schema is defined with a static `SCHEMA_DATA` dictionary in `schema_cmd.py`:
+
+1. Update the file at `my_custom_tool/commands/schema_cmd.py`:
 
 ```python
-# Update the SCHEMA_DATA dictionary in my_custom_tool/commands/schema_cmd.py
+# Update the SCHEMA_DATA dictionary with your new commands
 SCHEMA_DATA = {
-    # ... existing commands ...
+    "config": {
+        "help": "Manage configuration files",
+        "subcommands": {
+            # configuration subcommands...
+        }
+    },
     "custom": {
         "help": "Custom commands for specific functionality",
         "subcommands": {
@@ -432,22 +443,133 @@ SCHEMA_DATA = {
                     "INPUT_FILE": "Path to the file to process"
                 }
             },
-            "generate": {
-                "help": "Generate sample data",
-                "options": {
-                    "--output, -o": "Output file path",
-                    "--format, -f": "Output format (json, yaml, csv)",
-                    "--verbose, -v": "Enable verbose output",
-                    "--count, -n": "Number of items to generate"
-                }
-            },
-            # ... add other commands ...
+            # ... other commands ...
         }
+    },
+    "schema": {
+        "help": "Display command structure as ASCII art",
+        "subcommands": {}
+    },
+    "help": {
+        "help": "Display help information",
+        "subcommands": {}
     }
 }
 ```
 
-For a more scalable approach, consider using the CommandRegistry system described in the dynamic_command_support.md document.
+2. Update any references to the original tool name in the schema module:
+
+```python
+@click.group(name="schema")
+def schema_group():
+    """Display command structure of my-custom-tool as ASCII art."""
+    pass
+
+@schema_group.command(name="show")
+@click.argument("command", required=False)
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def show_schema(command: str, verbose: bool):
+    """Show schema for a specific command or the entire CLI."""
+    # ... implementation ...
+    
+    # If using OutputFormatter, ensure any references to the CLI name are updated:
+    if not command:
+        # Show schema for all commands
+        OutputFormatter.print_command_tree(SCHEMA_DATA, title="My Custom Tool Commands")
+```
+
+### 3.2 Dynamic Schema with Command Registry
+
+If your project uses the `CommandRegistry` system (recommended for tools with dynamically created commands):
+
+1. Modify the `CommandRegistry` class in `my_custom_tool/utils/command_registry.py`:
+
+```python
+class CommandRegistry:
+    # ... existing implementation ...
+    
+    @staticmethod
+    def print_command_tree(schema_data):
+        """Print a visual representation of the command structure."""
+        console = Console()
+        # Update the tool name in the tree title
+        tree = Tree("📋 [bold yellow]My Custom Tool[/bold yellow]")
+        
+        # ... rest of the method ...
+```
+
+2. Update the schema command to use the registry:
+
+```python
+# my_custom_tool/commands/schema_cmd.py
+import click
+from ..utils.context import ContextManager
+from ..utils.formatting import OutputFormatter
+from ..utils.command_registry import CommandRegistry
+
+@click.group(name="schema")
+def schema_group():
+    """Display command structure of My Custom Tool as ASCII art."""
+    pass
+
+@schema_group.command(name="show")
+@click.argument("command", required=False)
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def show_schema(command: str, verbose: bool):
+    """Show schema for a specific command or the entire CLI."""
+    # Ensure context is initialized
+    try:
+        ctx = ContextManager.get_instance()
+    except RuntimeError:
+        ctx = ContextManager.initialize({"verbose": verbose})
+    
+    # Get command registry
+    registry = CommandRegistry.get_instance()
+    
+    if command:
+        # Show schema for specific command
+        if registry.get_command(command):
+            command_schema = registry.get_schema(command)
+            OutputFormatter.print_command_tree(command_schema, title=f"Command: {command}")
+        else:
+            # Command not found
+            OutputFormatter.print_error(f"Command not found: {command}")
+    else:
+        # Show schema for all commands
+        schema_data = registry.get_schema()
+        OutputFormatter.print_command_tree(schema_data, title="My Custom Tool Commands")
+```
+
+3. Ensure command registration is properly initialized in `main.py`:
+
+```python
+# At the end of main.py, after all commands are added
+from my_custom_tool.utils.command_registry import CommandRegistry
+registry = CommandRegistry.get_instance()
+registry.register_commands_from_cli(cli)
+```
+
+### 3.3 Update Formatting Utilities
+
+Look for any hardcoded references to the original tool name in formatting utilities:
+
+1. Check `my_custom_tool/utils/formatting.py`:
+
+```python
+class OutputFormatter:
+    # ...
+    
+    @staticmethod
+    def print_command_tree(schema_data, title="Command Structure"):
+        """Print a visual representation of the command structure."""
+        console = Console()
+        # Update the title to use your custom tool name if needed
+        tree = Tree(f"📋 [bold yellow]{title}[/bold yellow]")
+        
+        # ... rest of the method ...
+```
+
+2. Update any ASCII art or formatted outputs that might reference the tool name.
 
 ## 4. Installing and Testing
 
@@ -462,6 +584,9 @@ Test the tool with your new name:
 ```bash
 # Check the basic help
 mytool --help
+
+# Try the schema command
+mytool schema show
 
 # Try your new commands
 mytool custom version
