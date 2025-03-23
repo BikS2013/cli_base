@@ -5,7 +5,7 @@ Universal CLI template with standardized commands, profiles, and configuration m
 
 import click
 from cli_base.commands.config_cmd import config_group
-from cli_base.extensibility.llm_cmd import llm_group
+from cli_base.extensibility.llm_extension import llm_group
 from cli_base.commands.schema_cmd import schema_group
 from cli_base.utils.context import ContextManager
 from cli_base.utils.formatting import OutputFormatter
@@ -39,6 +39,12 @@ def cli(verbose: bool, quiet: bool):
 cli.add_command(config_group)
 cli.add_command(llm_group)
 cli.add_command(schema_group)
+# Add other profile command groups here
+
+# Now register all commands in the CommandRegistry
+from cli_base.utils.command_registry import CommandRegistry
+registry = CommandRegistry.get_instance()
+registry.register_commands_from_cli(cli)
 
 
 @cli.command(name="help")
@@ -48,24 +54,27 @@ def help_command(command, subcommand):
     """Display help information for commands."""
     ctx = click.get_current_context()
     
+    # Get command registry
+    from cli_base.utils.command_registry import CommandRegistry
+    registry = CommandRegistry.get_instance()
+    
     if command:
         # Show help for a specific command
-        if command in ctx.parent.command.commands:
-            cmd = ctx.parent.command.commands[command]
-            
-            if subcommand and subcommand in cmd.commands:
+        cmd_obj = registry.get_command(command)
+        
+        if cmd_obj:
+            if subcommand and subcommand in cmd_obj.commands:
                 # Show help for a specific subcommand
-                sub_cmd = cmd.commands[subcommand]
+                sub_cmd = cmd_obj.commands[subcommand]
                 click.echo(sub_cmd.get_help(ctx))
             else:
                 # Show help for the command
-                click.echo(cmd.get_help(ctx))
+                click.echo(cmd_obj.get_help(ctx))
         else:
             OutputFormatter.print_error(f"Unknown command: {command}")
     else:
         # Show general help
         click.echo(ctx.parent.get_help())
-
 
 if __name__ == "__main__":
     cli()

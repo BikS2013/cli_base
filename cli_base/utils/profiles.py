@@ -4,7 +4,7 @@ Handles different types of profiles like LLM, database, etc.
 """
 
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TypedDict
 from .context import ContextManager
 
 
@@ -82,4 +82,116 @@ class ProfileManager:
             # Not valid JSON, assume it's a profile name reference
             return {"name": input_str}
 
+
+class ProfileSpec(TypedDict, total=False):
+    """Type specification for profile parameters."""
+    name: str
+    type: type
+    help: str
+    required: bool
+
+class ProfileValidationResult(TypedDict):
+    """Result of profile validation."""
+    valid: bool
+    errors: List[str]
+    profile: Dict[str, Any]
+
+class BaseProfileManager(ProfileManager):
+    """Base class for profile managers with extended validation capabilities."""
     
+    def __init__(self, profile_type: str, profile_params: List[ProfileSpec]):
+        """
+        Initialize a profile manager.
+        
+        Args:
+            profile_type: The profile type identifier used in config
+            profile_params: Profile parameter specifications
+        """
+        super().__init__(profile_type)
+        self.profile_params = profile_params
+        
+    def validate_profile(self, profile: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate a profile against the parameter specifications.
+        
+        This base implementation checks required fields and applies defaults.
+        Subclasses may override to add additional validation.
+        
+        Args:
+            profile: The profile data to validate
+            
+        Returns:
+            The validated and normalized profile data
+            
+        Raises:
+            ValueError: If validation fails
+        """
+        # Check required fields
+        required_fields = [param["name"] for param in self.profile_params if param.get("required", False)]
+        for field in required_fields:
+            if field not in profile:
+                raise ValueError(f"Missing required field: {field}")
+        
+        # Apply field-specific validation (to be implemented by subclasses)
+        validation_result = self._validate_field_values(profile)
+        if not validation_result["valid"]:
+            raise ValueError(", ".join(validation_result["errors"]))
+            
+        # Apply defaults
+        normalized_profile = self._apply_default_values(validation_result["profile"])
+        
+        return normalized_profile
+    
+    def _validate_field_values(self, profile: Dict[str, Any]) -> ProfileValidationResult:
+        """
+        Validate field values beyond basic required field checking.
+        
+        Subclasses should override this method to implement 
+        field-specific validation logic.
+        
+        Args:
+            profile: The profile data to validate
+            
+        Returns:
+            Validation result including errors and normalized profile
+        """
+        # Base implementation just passes through
+        return {
+            "valid": True,
+            "errors": [],
+            "profile": profile 
+        }
+    
+    def _apply_default_values(self, profile: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply default values for optional fields.
+        
+        Subclasses should override this method to apply any
+        default values for optional fields.
+        
+        Args:
+            profile: The profile data to apply defaults to
+            
+        Returns:
+            Profile with defaults applied
+        """
+        # Base implementation just returns the profile as-is
+        return profile
+    
+    def create_profile(self, profile_data: Dict[str, Any], scope: str) -> Dict[str, Any]:
+        """Create a new profile with validation."""
+        validated_profile = self.validate_profile(profile_data)
+        return super().create_profile(validated_profile, scope)
+        
+    def edit_profile(self, name: str, updates: Dict[str, Any], scope: str) -> Dict[str, Any]:
+        """Edit a profile with validation."""
+        # First, get the existing profile
+        existing = self.get_profile_from_scope(name, scope)
+        
+        # Merge updates with existing profile
+        merged = {**existing, **updates}
+        
+        # Validate the merged profile
+        validated = self.validate_profile(merged)
+        
+        return super().edit_profile(name, validated, scope)
