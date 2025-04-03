@@ -113,7 +113,8 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
         OutputFormatter.print_error(f"Error: {str(e)}")
     
     # Print runtime settings at the end if verbose mode is enabled
-    OutputFormatter.end_command_with_runtime_settings(include_configs=False)
+    if verbose:
+        OutputFormatter.end_command_with_runtime_settings(include_configs=False)
 
 @standard_command()
 @generate_group.command("chat")
@@ -209,7 +210,8 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
         OutputFormatter.print_error(f"Error: {str(e)}")
     
     # Print runtime settings at the end if verbose mode is enabled
-    OutputFormatter.end_command_with_runtime_settings(include_configs=False)
+    if verbose:
+        OutputFormatter.end_command_with_runtime_settings(include_configs=False)
 
 # Export the command group
 generate_command = generate_group

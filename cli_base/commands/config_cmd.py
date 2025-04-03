@@ -287,3 +287,141 @@ def generate_config(scope: str, file_path: Optional[str] = None):
         OutputFormatter.print_error(str(e))
 
 
+@standard_command()
+@config_group.command(name="status")
+@click.option("--include-paths/--no-paths", default=True, help="Include file paths in the output")
+@click.option("--include-configs/--no-configs", default=True, help="Include raw configurations in the output")
+@click.option("--include-context/--no-context", default=True, help="Include the runtime context in the output")
+@click.option("--include-cli-args/--no-cli-args", default=True, help="Include CLI arguments in the output")
+@click.option("--format", type=click.Choice(["json", "table"]), default="json", help="Output format")
+def config_status(
+    include_paths: bool, 
+    include_configs: bool, 
+    include_context: bool, 
+    include_cli_args: bool,
+    format: str,
+    scope: Optional[str] = None, 
+    file_path: Optional[str] = None
+):
+    """
+    Display complete runtime settings status.
+    
+    This command provides a comprehensive view of the current runtime settings,
+    including configuration paths, command context, CLI arguments, and more.
+    Use the various flags to control what information is included in the output.
+    """
+    # Context is already initialized by standard_command
+    # Get context and settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
+    
+    # Detect verbose mode and set it
+    verbose = OutputFormatter.detect_verbose_mode()
+    
+    # Print verbose information if enabled
+    OutputFormatter.print_command_verbose_info("config status", 
+                                            include_paths=include_paths,
+                                            include_configs=include_configs,
+                                            include_context=include_context,
+                                            include_cli_args=include_cli_args)
+    
+    try:
+        # Generate JSON representation with the specified inclusions
+        status_json = rt.to_json(
+            include_paths=include_paths,
+            include_configs=include_configs,
+            include_context=include_context,
+            include_cli_args=include_cli_args
+        )
+        
+        # Output in the requested format
+        if format == "json":
+            # Print as JSON with pretty formatting
+            OutputFormatter.print_json(status_json, "Runtime Settings Status")
+        else:  # table format
+            # Convert the flat parts of the JSON to tables
+            # Basic settings
+            basic_settings = [
+                {"Setting": "Current Scope", "Value": status_json["current_scope"]},
+                {"Setting": "Verbose Mode", "Value": str(status_json["verbose"])},
+                {"Setting": "Quiet Mode", "Value": str(status_json["quiet"])}
+            ]
+            OutputFormatter.print_table(basic_settings, ["Setting", "Value"], "Basic Settings")
+            
+            # Config status
+            if "config_status" in status_json:
+                config_status_data = [
+                    {"Configuration": "Global", "Exists": "✓" if status_json["config_status"]["global_exists"] else "✗"},
+                    {"Configuration": "Local", "Exists": "✓" if status_json["config_status"]["local_exists"] else "✗"},
+                ]
+                if "named_exists" in status_json["config_status"]:
+                    config_status_data.append({
+                        "Configuration": "Named", 
+                        "Exists": "✓" if status_json["config_status"]["named_exists"] else "✗"
+                    })
+                OutputFormatter.print_table(config_status_data, ["Configuration", "Exists"], "Configuration Status")
+            
+            # Command context
+            if "command_context" in status_json:
+                cmd_context = status_json["command_context"]
+                cmd_context_data = []
+                for key, value in cmd_context.items():
+                    if value is not None:
+                        cmd_context_data.append({"Property": key, "Value": str(value)})
+                if cmd_context_data:
+                    OutputFormatter.print_table(cmd_context_data, ["Property", "Value"], "Command Context")
+            
+            # If we have effective configuration
+            if include_context and "effective_config" in status_json:
+                # Settings table
+                if "settings" in status_json["effective_config"]:
+                    settings_data = []
+                    for key, value in status_json["effective_config"]["settings"].items():
+                        settings_data.append({"Setting": key, "Value": str(value)})
+                    OutputFormatter.print_table(settings_data, ["Setting", "Value"], "Effective Settings")
+                
+                # Default profiles table
+                if "defaults" in status_json["effective_config"]:
+                    defaults_data = []
+                    for profile_type, profile_name in status_json["effective_config"]["defaults"].items():
+                        defaults_data.append({
+                            "Profile Type": profile_type, 
+                            "Default Profile": str(profile_name) if profile_name else "None"
+                        })
+                    OutputFormatter.print_table(defaults_data, ["Profile Type", "Default Profile"], "Default Profiles")
+                
+                # Available profiles
+                if "profile_names" in status_json["effective_config"]:
+                    for profile_type, profiles in status_json["effective_config"]["profile_names"].items():
+                        if profiles:
+                            profile_data = [{"Name": name} for name in profiles]
+                            OutputFormatter.print_table(profile_data, ["Name"], f"{profile_type.capitalize()} Profiles")
+            
+            # Paths table
+            if include_paths and "paths" in status_json:
+                paths_data = []
+                for key, value in status_json["paths"].items():
+                    paths_data.append({"Path Type": key, "Location": value})
+                OutputFormatter.print_table(paths_data, ["Path Type", "Location"], "Configuration Paths")
+            
+            # CLI Arguments table
+            if include_cli_args and "cli_args" in status_json:
+                cli_args_data = []
+                for key, value in status_json["cli_args"].items():
+                    cli_args_data.append({"Argument": key, "Value": str(value)})
+                if cli_args_data:
+                    OutputFormatter.print_table(cli_args_data, ["Argument", "Value"], "CLI Arguments")
+            
+            # System Arguments
+            if include_cli_args and "sys_argv" in status_json:
+                sys_argv_data = [{"Index": i, "Argument": arg} for i, arg in enumerate(status_json["sys_argv"])]
+                OutputFormatter.print_table(sys_argv_data, ["Index", "Argument"], "System Arguments")
+    
+    except Exception as e:
+        OutputFormatter.print_error(f"Error generating runtime settings: {str(e)}")
+    
+    # Print runtime settings at the end if verbose mode is enabled
+    if verbose:
+        OutputFormatter.end_command_with_runtime_settings(include_configs=False)
+
+
