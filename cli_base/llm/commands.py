@@ -11,7 +11,7 @@ from cli_base.utils.formatting import OutputFormatter
 from cli_base.utils.context import ContextManager, initialize_context
 from cli_base.utils.advanced_settings import get_parameter_value
 from cli_base.utils.param_resolver import with_resolved_params
-from cli_base.commands.cmd_options import scope_options
+from cli_base.commands.cmd_options import scope_options, standard_command
 from langchain_core.messages import HumanMessage
 
 @click.group("generate")
@@ -19,14 +19,13 @@ def generate_group():
     """Generate content using LLM models."""
     pass
 
+@standard_command()
 @generate_group.command("prompt")
 @click.argument("prompt", type=str)
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
 @click.option("--stream/--no-stream", default=True, help="Stream the response (default: True)")
 @click.option("--max-tokens", type=int, help="Override max tokens for this request")
 @click.option("--temperature", type=float, help="Override temperature for this request")
-@scope_options
-@with_resolved_params
 def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = True, 
                    max_tokens: Optional[int] = None, temperature: Optional[float] = None,
                    scope: Optional[str] = None, file_path: Optional[str] = None):
@@ -35,12 +34,7 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
     
     Uses either the specified profile or the default profile.
     """
-    # Initialize context if not already initialized
-    try:
-        scope_params = {"scope": scope, "file_path": file_path}
-        initialize_context(scope_params)
-    except Exception as e:
-        OutputFormatter.print_error(f"Error initializing context: {str(e)}")
+    # Context is already initialized by standard_command
     
     try:
         # Get the profile manager
@@ -105,22 +99,16 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
     except Exception as e:
         OutputFormatter.print_error(f"Error: {str(e)}")
 
+@standard_command()
 @generate_group.command("chat")
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
-@scope_options
-@with_resolved_params
 def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None, file_path: Optional[str] = None):
     """
     Start an interactive chat session with an LLM.
     
     Press Ctrl+D or type 'exit' to end the session.
     """
-    # Initialize context
-    try:
-        scope_params = {"scope": scope, "file_path": file_path}
-        initialize_context(scope_params)
-    except Exception as e:
-        OutputFormatter.print_error(f"Error initializing context: {str(e)}")
+    # Context is already initialized by standard_command
     
     try:
         # Get the profile manager

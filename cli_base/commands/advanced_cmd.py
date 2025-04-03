@@ -7,9 +7,10 @@ import click
 from typing import Optional, Dict, Any
 
 from cli_base.utils.advanced_settings import get_parameter_value
-from cli_base.utils.context import initialize_context
+from cli_base.utils.context import initialize_context, ContextManager
 from cli_base.utils.formatting import OutputFormatter
 from cli_base.utils.param_resolver import with_resolved_params
+from cli_base.commands.cmd_options import standard_command
 
 
 @click.group("advanced")
@@ -18,11 +19,11 @@ def advanced_group():
     pass
 
 
+@standard_command()
 @advanced_group.command("config")
 @click.argument("key", required=False)
 @click.argument("value", required=False)
-@with_resolved_params
-def advanced_config(key: Optional[str] = None, value: Optional[str] = None):
+def advanced_config(key: Optional[str] = None, value: Optional[str] = None, scope: str = None, file_path: str = None):
     """
     View or set command-specific configuration.
     
@@ -30,8 +31,8 @@ def advanced_config(key: Optional[str] = None, value: Optional[str] = None):
     If only KEY is provided, shows the value for that key.
     If both KEY and VALUE are provided, sets the value for that key.
     """
-    # Initialize context
-    ctx = initialize_context()
+    # Context is already initialized by standard_command
+    ctx = ContextManager.get_instance()
     advanced_settings = ctx.settings
     
     # Get current command path
@@ -100,21 +101,22 @@ def advanced_config(key: Optional[str] = None, value: Optional[str] = None):
         OutputFormatter.print_info(f"Set {key} = {typed_value} for command {command_path} in {current_scope} configuration.")
 
 
+@standard_command()
 @advanced_group.command("exec")
 @click.argument("command_name")
 @click.option("--param1", help="Example parameter 1")
 @click.option("--param2", help="Example parameter 2")
 @click.option("--param3", type=int, help="Example parameter 3")
-@with_resolved_params
 def advanced_exec(command_name: str, param1: Optional[str] = None, 
-                 param2: Optional[str] = None, param3: Optional[int] = None):
+                 param2: Optional[str] = None, param3: Optional[int] = None,
+                 scope: str = None, file_path: str = None):
     """
     Execute a command with resolved parameters.
     
     This command demonstrates how parameters are resolved from different sources.
     """
-    # Initialize context
-    ctx = initialize_context()
+    # Context is already initialized by standard_command
+    ctx = ContextManager.get_instance()
     advanced_settings = ctx.settings
     
     # Get parameters using advanced parameter resolution

@@ -8,7 +8,7 @@ from cli_base.commands.config_cmd import config_group
 from cli_base.extensibility.llm_extension import llm_group
 from cli_base.commands.schema_cmd import schema_group
 from cli_base.commands.advanced_cmd import advanced_command
-from cli_base.commands.cmd_options import scope_options
+from cli_base.commands.cmd_options import scope_options, standard_command
 from cli_base.utils.context import ContextManager
 from cli_base.utils.formatting import OutputFormatter
 

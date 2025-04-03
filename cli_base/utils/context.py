@@ -61,7 +61,8 @@ class ContextManager:
             RuntimeError: If the context manager has not been initialized
         """
         if cls._instance is None:
-            raise RuntimeError("ContextManager not initialized. Call initialize() first.")
+            # Auto-initialize with default settings rather than raising an error
+            return cls.initialize({"scope": "local"})
         return cls._instance
 
     @property

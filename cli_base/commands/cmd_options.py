@@ -1,4 +1,13 @@
 import click
+import functools
+from typing import Callable, TypeVar, Optional, Dict, Any, List, Union
+
+# Import these here to avoid circular imports
+from ..utils.param_resolver import with_resolved_params
+from ..utils.context import initialize_context, ContextManager
+
+# Type variable for command function
+CommandFunc = TypeVar('CommandFunc', bound=Callable)
 
 #@click.option("--name", type=str, required=True, help="Profile name")
 def profile_name_option(command):
@@ -13,7 +22,8 @@ def profile_name_option(command):
 
 
 SCOPE_PARAMS = [
-    {"name": "global", "func_param":"scope",  "flag_value": "global", "help": "Use global configuration"},
+    # The order is important - the global option needs to be first to take precedence
+    {"name": "global", "func_param":"scope", "flag_value": "global", "help": "Use global configuration"},
     {"name": "local", "func_param":"scope", "flag_value": "local", "default": True, "help": "Use local configuration"},
     {"name": "file", "func_param":"file_path", "type": str, "help": "Use named configuration file"},
 ]
@@ -68,3 +78,81 @@ def json_format_option(command):
         help="Output format"
     )(command)
     return command
+
+
+def standard_command(init_context: bool = True) -> Callable[[CommandFunc], CommandFunc]:
+    """
+    Comprehensive decorator for standard command patterns.
+    
+    This decorator combines several common patterns for CLI commands:
+    1. Adds configuration scope options (--global, --local, --file)
+    2. Initializes the context with scope parameters (optional)
+    3. Resolves parameters via the parameter resolver
+    
+    Args:
+        init_context: Whether to automatically initialize the context
+                      Set to False if you want to defer context initialization
+                      
+    Example usage:
+    
+    @standard_command()
+    @config_group.command("show")
+    def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
+        # Context is already initialized, settings already available
+        ctx = ContextManager.get_instance()
+        rt = ctx.settings
+        # Rest of your command implementation...
+    """
+    def decorator(func: CommandFunc) -> CommandFunc:
+        # Apply scope options
+        func = scope_options(func)
+        
+        # Create a wrapper that initializes context
+        @functools.wraps(func)
+        def context_wrapper(*args, **kwargs):
+            # Extract scope parameters
+            scope_params = {
+                "scope": kwargs.get("scope"),
+                "file_path": kwargs.get("file_path")
+            }
+            
+            # Handle global flag and file path specially because of decorator ordering issues
+            import sys
+            if "--global" in sys.argv:
+                scope_params["scope"] = "global"
+                
+            # Check for file parameter
+            if "--file" in sys.argv:
+                try:
+                    file_index = sys.argv.index("--file")
+                    if file_index + 1 < len(sys.argv):
+                        scope_params["file_path"] = sys.argv[file_index + 1]
+                except ValueError:
+                    pass
+            
+            # Debug information if verbose
+            if kwargs.get("verbose", False):
+                from ..utils.formatting import OutputFormatter
+                OutputFormatter.print_info(f"Decorator received scope: {scope_params}")
+                OutputFormatter.print_info(f"All kwargs: {kwargs}")
+            
+            # Initialize context if requested
+            if init_context:
+                try:
+                    initialize_context(scope_params)
+                except Exception as e:
+                    from ..utils.formatting import OutputFormatter
+                    OutputFormatter.print_error(f"Error initializing context: {str(e)}")
+            
+            # Call the original function
+            return func(*args, **kwargs)
+        
+        # Return either the context wrapper or the param resolver + context wrapper
+        if init_context:
+            # Apply context initialization before parameter resolution
+            return with_resolved_params(context_wrapper)
+        else:
+            # Just apply parameter resolution
+            return with_resolved_params(func)
+    
+    return decorator

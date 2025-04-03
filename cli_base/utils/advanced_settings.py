@@ -83,6 +83,10 @@ class AdvancedRTSettings:
         # Store CLI arguments
         self.cli_args = resolved_args or {}
         
+        # Add system arguments to CLI args for better flag checking
+        import sys
+        self.cli_args["sys.argv"] = sys.argv
+        
         # Verbose and quiet flags from CLI
         self.verbose = self.cli_args.get("verbose", False)
         self.quiet = self.cli_args.get("quiet", False)
@@ -179,9 +183,61 @@ class AdvancedRTSettings:
         # Start with defaults
         runtime_config = self.DEFAULT_CONFIG.copy()
         
-        # Determine current scope
+        # Determine current scope by checking system arguments directly
+        # This is more reliable than checking the resolved parameters
+        sys_argv = self.cli_args.get('sys.argv', [])
+        sys_argv_str = ' '.join(sys_argv)
+        
+        # Check for global flag
+        use_global = False
+        if '--global' in sys_argv_str:
+            use_global = True
+        
+        # Check for file flag
+        use_file = False
+        file_path = None
+        if '--file' in sys_argv_str:
+            use_file = True
+            try:
+                file_index = sys_argv.index('--file')
+                if file_index + 1 < len(sys_argv):
+                    file_path = sys_argv[file_index + 1]
+            except (ValueError, IndexError):
+                pass
+        
+        # Also check if scope and file parameters are set through other means
         current_scope = self.cli_args.get("scope", "local")
-        has_file_option = self.cli_args.get("file_path") is not None
+        if current_scope == "global":
+            use_global = True
+            
+        cli_file_path = self.cli_args.get("file_path")
+        if cli_file_path:
+            use_file = True
+            file_path = cli_file_path
+        
+        from .formatting import OutputFormatter
+        if self.verbose:
+            OutputFormatter.print_info(f"Using global: {use_global}")
+            OutputFormatter.print_info(f"Using file: {use_file}, path: {file_path}")
+            OutputFormatter.print_info(f"Current scope: {current_scope}")
+            OutputFormatter.print_info(f"CLI args: {self.cli_args}")
+            
+        has_file_option = use_file and file_path is not None
+        
+        # If we have a file path but the named_config wasn't loaded, try loading it again
+        if has_file_option and file_path and not self.named_config:
+            self.named_config_path = Path(os.path.expanduser(file_path))
+            if self.named_config_path.exists():
+                try:
+                    with open(self.named_config_path, 'r') as f:
+                        self.named_config = json.load(f)
+                    if self.verbose:
+                        OutputFormatter.print_info(f"Loaded named config from {file_path}")
+                except (json.JSONDecodeError, IOError) as e:
+                    if self.verbose:
+                        OutputFormatter.print_error(f"Error loading named config: {str(e)}")
+                    # Keep None if named config is invalid or can't be read
+                    self.named_config = None
         
         # Build config according to specified scope
         if has_file_option:
@@ -192,23 +248,33 @@ class AdvancedRTSettings:
                 runtime_config = self._deep_merge(runtime_config, self.named_config)
                 self.context = runtime_config
                 self.context["current_scope"] = "file"
+                if self.verbose:
+                    from .formatting import OutputFormatter
+                    OutputFormatter.print_info(f"Using FILE configuration: {file_path}")
             else:
                 # If named config not found, fall back to standard precedence
                 runtime_config = self._deep_merge(runtime_config, self.global_config)
                 runtime_config = self._deep_merge(runtime_config, self.local_config)
                 self.context = runtime_config
                 self.context["current_scope"] = "local"
-        elif current_scope == "global":
+                if self.verbose:
+                    from .formatting import OutputFormatter
+                    OutputFormatter.print_error(f"File configuration not found: {file_path}, using LOCAL configuration as fallback")
+        elif use_global:
             # --global option: only global -> defaults
             runtime_config = self._deep_merge(runtime_config, self.global_config)
             self.context = runtime_config
             self.context["current_scope"] = "global"
+            if self.verbose:
+                OutputFormatter.print_info("Using GLOBAL configuration")
         else:
             # --local option or default: local -> global -> defaults
             runtime_config = self._deep_merge(runtime_config, self.global_config)
             runtime_config = self._deep_merge(runtime_config, self.local_config)
             self.context = runtime_config
             self.context["current_scope"] = "local"
+            if self.verbose:
+                OutputFormatter.print_info("Using LOCAL configuration")
         
         # Add CLI args to context
         self.context["cli_args"] = self.cli_args

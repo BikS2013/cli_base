@@ -6,6 +6,7 @@ Handles the retrieval and preparation of all parameters needed for command execu
 import click
 from typing import Any, Dict, Optional, List, Callable, TypeVar, Union, Set
 import inspect
+import functools
 from .context import ContextManager, initialize_context
 
 # Type variable for the command function
@@ -104,6 +105,13 @@ class ParameterResolver:
         # Extract scope parameter
         if "scope" in params and params["scope"] is not None:
             scope_params["scope"] = params["scope"]
+            
+        # Check verbose flag for debugging
+        verbose = params.get("verbose", False)
+        if verbose:
+            from cli_base.utils.formatting import OutputFormatter
+            OutputFormatter.print_info(f"Extracted scope params: {scope_params}")
+            OutputFormatter.print_info(f"From params: {params}")
             
         return scope_params
     
@@ -220,6 +228,7 @@ def with_resolved_params(func: CommandFunc) -> CommandFunc:
     Returns:
         Wrapped function that receives resolved parameters
     """
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # Get the current Click context
         ctx = click.get_current_context()
@@ -235,10 +244,6 @@ def with_resolved_params(func: CommandFunc) -> CommandFunc:
         
         # Call the original function with resolved parameters
         return func(*args, **kwargs)
-    
-    # Preserve the original function's metadata
-    wrapper.__name__ = func.__name__
-    wrapper.__doc__ = func.__doc__
     
     return wrapper
 

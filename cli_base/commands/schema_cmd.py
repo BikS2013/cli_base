@@ -7,6 +7,7 @@ import click
 from ..utils.context import ContextManager
 from ..utils.formatting import OutputFormatter
 from ..utils.command_registry import CommandRegistry
+from .cmd_options import standard_command
 
 @click.group(name="schema")
 def schema_group():
@@ -14,16 +15,14 @@ def schema_group():
     pass
 
 
+@standard_command(init_context=False)
 @schema_group.command(name="show")
 @click.argument("command", required=False)
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
-def show_schema(command: str, verbose: bool):
+def show_schema(command: str, verbose: bool, scope: str = None, file_path: str = None):
     """Show schema for a specific command or the entire CLI."""
-    # Ensure context is initialized
-    try:
-        ctx = ContextManager.get_instance()
-    except RuntimeError:
-        ctx = ContextManager.initialize({"verbose": verbose})
+    # Initialize context with verbose parameter
+    ctx = ContextManager.initialize({"scope": scope, "file_path": file_path, "verbose": verbose})
     
     # Get command registry
     registry = CommandRegistry.get_instance()

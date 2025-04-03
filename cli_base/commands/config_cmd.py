@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 from ..utils.context import ContextManager, initialize_context
 from ..utils.formatting import OutputFormatter
 from ..utils.param_resolver import with_resolved_params
-from .cmd_options import scope_options
+from .cmd_options import scope_options, standard_command
 
 
 @click.group(name="config")
@@ -18,14 +18,11 @@ def config_group():
     pass
 
 
+@standard_command()
 @config_group.command(name="show")
-@scope_options
-@with_resolved_params
 def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
     """Display configuration content."""
-    # Initialize context with our parameters
-    initialize_context({"scope": scope, "file_path": file_path})
-    
+    # Context is already initialized by standard_command
     # Get context and settings
     ctx = ContextManager.get_instance()
     rt = ctx.settings
@@ -44,10 +41,11 @@ def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
         OutputFormatter.print_error(str(e))
 
 
+@standard_command()
 @config_group.command(name="save")
-@scope_options
 def save_config(scope: str, file_path: Optional[str] = None):
     """Save current parameters to configuration."""
+    # Context is already initialized by standard_command
     # Get runtime settings
     ctx = ContextManager.get_instance()
     rt = ctx.settings
@@ -61,11 +59,12 @@ def save_config(scope: str, file_path: Optional[str] = None):
         OutputFormatter.print_error(str(e))
 
 
+@standard_command()
 @config_group.command(name="update")
-@scope_options
 @click.argument("update_json", required=True)
 def update_config(scope: str, update_json: str, file_path: Optional[str] = None):
     """Update configuration with current parameters."""
+    # Context is already initialized by standard_command
     # Get runtime settings
     ctx = ContextManager.get_instance()
     rt = ctx.settings
@@ -87,11 +86,12 @@ def update_config(scope: str, update_json: str, file_path: Optional[str] = None)
         OutputFormatter.print_error(str(e))
 
 
+@standard_command()
 @config_group.command(name="replace")
-@scope_options
 @click.argument("config_json", required=True)
 def replace_config(scope: str, config_json: str, file_path: Optional[str] = None):
     """Replace entire configuration with current parameters."""
+    # Context is already initialized by standard_command
     # Get runtime settings
     ctx = ContextManager.get_instance()
     rt = ctx.settings
@@ -213,11 +213,12 @@ def export_config(from_scope: str, from_file: Optional[str], to_file: str):
         OutputFormatter.print_error(str(e))
 
 
+@standard_command()
 @config_group.command(name="reset")
-@scope_options
 @click.confirmation_option(prompt="Are you sure you want to reset the configuration?")
 def reset_config(scope: str, file_path: Optional[str] = None):
     """Reset configuration to defaults."""
+    # Context is already initialized by standard_command
     # Get runtime settings
     ctx = ContextManager.get_instance()
     rt = ctx.settings
@@ -236,10 +237,11 @@ def reset_config(scope: str, file_path: Optional[str] = None):
         OutputFormatter.print_error(str(e))
 
 
+@standard_command()
 @config_group.command(name="generate")
-@scope_options
 def generate_config(scope: str, file_path: Optional[str] = None):
     """Generate command-line instructions based on configuration."""
+    # Context is already initialized by standard_command
     # Get runtime settings
     ctx = ContextManager.get_instance()
     rt = ctx.settings
