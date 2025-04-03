@@ -39,9 +39,14 @@ class ProfileManager:
         return rt.get_profiles(self.profile_type, scope)
     
     def get_profile(self, name: str) -> Dict[str, Any]:
-        """Get a specific profile from the effective configuration."""
+        """
+        Get a specific profile from any available scope, following precedence rules.
+        
+        This method will check all available scopes for a profile with the given name,
+        following the precedence rules defined for configuration loading.
+        """
         rt = ContextManager.get_instance().settings
-        return rt.get_profile(self.profile_type, name)
+        return rt.get_profile_from_any_scope(self.profile_type, name)
     
     def get_profile_from_scope(self, name: str, scope: str) -> Dict[str, Any]:
         """Get a specific profile from a specific scope."""
@@ -69,9 +74,14 @@ class ProfileManager:
         rt.set_default_profile(self.profile_type, name, scope)
     
     def get_default_profile(self) -> Optional[str]:
-        """Get the name of the default profile."""
+        """
+        Get the name of the default profile.
+        
+        This method will check all available scopes for a default profile,
+        following the precedence rules defined for configuration loading.
+        """
         rt = ContextManager.get_instance().settings
-        return rt.get_default_profile(self.profile_type)
+        return rt.get_default_profile_from_any_scope(self.profile_type)
     
     def parse_profile_input(self, input_str: str) -> Dict[str, Any]:
         """Parse profile input string, which can be JSON or a name reference."""

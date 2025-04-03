@@ -22,7 +22,10 @@ except ImportError:
 @click.version_option()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress non-essential output")
-def cli(verbose: bool, quiet: bool):
+@click.option("--global", "scope", flag_value="global", help="Use global configuration")
+@click.option("--local", "scope", flag_value="local", is_flag=True, help="Use local configuration")
+@click.option("--file", "file_path", type=str, help="Use named configuration file")
+def cli(verbose: bool, quiet: bool, scope: str = None, file_path: str = None):
     """
     Universal CLI template with standardized commands, profiles, and configuration management.
     
@@ -31,7 +34,9 @@ def cli(verbose: bool, quiet: bool):
     # Initialize runtime settings with global CLI arguments
     cli_args = {
         "verbose": verbose,
-        "quiet": quiet
+        "quiet": quiet,
+        "scope": scope,
+        "file_path": file_path
     }
     
     try:

@@ -113,39 +113,69 @@ class RTSettings:
 
     def _build_runtime_context(self):
         """
-        Build the runtime context by merging configurations according to precedence rules:
-        1. Command line arguments
-        2. Named configuration (if specified)
-        3. Local configuration
-        4. Global configuration
-        5. Default values
+        Build the runtime context by merging configurations according to precedence rules
+        based on which configuration scope options are specified:
+        
+        If --file option is used:
+            1. Command line arguments
+            2. Named configuration file
+            3. Local configuration (for missing elements)
+            4. Global configuration (for missing elements)
+            5. Default values
+            
+        If --local option is used:
+            1. Command line arguments
+            2. Local configuration
+            3. Global configuration (for missing elements)
+            4. Default values
+            
+        If --global option is used:
+            1. Command line arguments
+            2. Global configuration
+            3. Default values
+            
+        Default (no option specified):
+            1. Command line arguments
+            2. Local configuration
+            3. Global configuration
+            4. Default values
         """
         # Start with defaults
         runtime_config = self.DEFAULT_CONFIG.copy()
         
-        # Merge global config
-        runtime_config = self._deep_merge(runtime_config, self.global_config)
+        # Determine current scope
+        current_scope = self.cli_args.get("scope", "local")
+        has_file_option = self.cli_args.get("file_path") is not None
         
-        # Merge local config
-        runtime_config = self._deep_merge(runtime_config, self.local_config)
-        
-        # Merge named config if available
-        if self.named_config:
-            runtime_config = self._deep_merge(runtime_config, self.named_config)
-        
-        # Store in context
-        self.context = runtime_config
+        # Build config according to specified scope
+        if has_file_option:
+            # --file option: file -> local -> global -> defaults
+            if self.named_config:
+                runtime_config = self._deep_merge(runtime_config, self.global_config)
+                runtime_config = self._deep_merge(runtime_config, self.local_config)
+                runtime_config = self._deep_merge(runtime_config, self.named_config)
+                self.context = runtime_config
+                self.context["current_scope"] = "file"
+            else:
+                # If named config not found, fall back to standard precedence
+                runtime_config = self._deep_merge(runtime_config, self.global_config)
+                runtime_config = self._deep_merge(runtime_config, self.local_config)
+                self.context = runtime_config
+                self.context["current_scope"] = "local"
+        elif current_scope == "global":
+            # --global option: only global -> defaults
+            runtime_config = self._deep_merge(runtime_config, self.global_config)
+            self.context = runtime_config
+            self.context["current_scope"] = "global"
+        else:
+            # --local option or default: local -> global -> defaults
+            runtime_config = self._deep_merge(runtime_config, self.global_config)
+            runtime_config = self._deep_merge(runtime_config, self.local_config)
+            self.context = runtime_config
+            self.context["current_scope"] = "local"
         
         # Add CLI args to context
         self.context["cli_args"] = self.cli_args
-        
-        # Add current config scope
-        if "scope" in self.cli_args:
-            self.context["current_scope"] = self.cli_args["scope"]
-        elif self.named_config:
-            self.context["current_scope"] = "file"
-        else:
-            self.context["current_scope"] = "local"  # Default to local
 
     def get_config_path(self, scope: str) -> Path:
         """Get the path to the configuration file based on scope."""
@@ -212,6 +242,51 @@ class RTSettings:
             raise ValueError(f"Profile not found: {name}")
         
         return self.context["profiles"][profile_type][name]
+        
+    def get_profile_from_any_scope(self, profile_type: str, name: str) -> Dict[str, Any]:
+        """
+        Get a specific profile from any available scope, following precedence rules.
+        
+        This method will first check the current scope, then fall back to
+        local, then global configurations looking for a profile with the given name.
+        
+        Args:
+            profile_type: The type of profile to get
+            name: The name of the profile to get
+            
+        Returns:
+            The profile data
+            
+        Raises:
+            ValueError: If the profile is not found in any scope
+        """
+        # First check effective merged configuration
+        try:
+            return self.get_profile(profile_type, name)
+        except ValueError:
+            # Not in effective config, check specific scopes
+            current_scope = self.context.get("current_scope")
+            
+            # Try specific scopes based on current scope
+            if current_scope == "file":
+                # Try local scope next
+                try:
+                    if (profile_type in self.local_config["profiles"] and 
+                        name in self.local_config["profiles"][profile_type]):
+                        return self.local_config["profiles"][profile_type][name]
+                except (KeyError, TypeError):
+                    pass
+                    
+            # Finally try global scope
+            try:
+                if (profile_type in self.global_config["profiles"] and 
+                    name in self.global_config["profiles"][profile_type]):
+                    return self.global_config["profiles"][profile_type][name]
+            except (KeyError, TypeError):
+                pass
+                
+        # Not found in any scope
+        raise ValueError(f"Profile '{name}' not found in any configuration scope")
 
     def get_profiles(self, profile_type: str, scope: str = None) -> Dict[str, Dict[str, Any]]:
         """Get all profiles of a specific type, optionally filtered by scope."""
@@ -226,8 +301,40 @@ class RTSettings:
             return self.context["profiles"][profile_type]
 
     def get_default_profile(self, profile_type: str) -> Optional[str]:
-        """Get the name of the default profile for a specific type."""
+        """
+        Get the name of the default profile for a specific type.
+        
+        Checks the effective configuration (merged from all scopes)
+        for a default profile of the given type.
+        """
         return self.context["defaults"].get(profile_type)
+        
+    def get_default_profile_from_any_scope(self, profile_type: str) -> Optional[str]:
+        """
+        Get the name of the default profile from any scope, following the precedence rules.
+        
+        This method will first check the current scope, then fall back to local,
+        then global configurations looking for a default profile of the given type.
+        """
+        # First check effective merged configuration
+        default_profile = self.context["defaults"].get(profile_type)
+        if default_profile:
+            return default_profile
+            
+        # Check specific scopes if not found in effective configuration
+        current_scope = self.context.get("current_scope")
+        
+        # If current scope is "file" and no default was found, check local scope
+        if current_scope == "file" and not default_profile:
+            if profile_type in self.local_config["defaults"] and self.local_config["defaults"][profile_type]:
+                return self.local_config["defaults"][profile_type]
+                
+        # Finally check global scope if still not found
+        if not default_profile:
+            if profile_type in self.global_config["defaults"] and self.global_config["defaults"][profile_type]:
+                return self.global_config["defaults"][profile_type]
+                
+        return None
 
     def set_default_profile(self, profile_type: str, name: str, scope: str) -> None:
         """Set a profile as the default for its type in the specified scope."""

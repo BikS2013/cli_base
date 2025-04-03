@@ -41,8 +41,43 @@ class ContextManager:
         return self._settings
     
 def _initialize_context(cli_args: Dict[str, Any]) -> ContextManager:
-    """Initialize or get the context manager instance."""
+    """
+    Initialize or get the context manager instance.
+    
+    This function checks if the context manager has already been initialized.
+    If it has, it will update the context with any new CLI arguments,
+    particularly focusing on configuration scope options (--global, --local, --file).
+    
+    Args:
+        cli_args: Command-line arguments passed to the command
+        
+    Returns:
+        The initialized or updated ContextManager instance
+    """
     try:
-        return ContextManager.get_instance()
+        # Get existing context manager
+        ctx = ContextManager.get_instance()
+        
+        # Update existing context with configuration scope options if provided
+        if cli_args:
+            current_settings = ctx.settings
+            
+            # Update file_path option if provided
+            if cli_args.get("file_path"):
+                current_settings.cli_args["file_path"] = cli_args["file_path"]
+                current_settings.named_config_path = None  # Reset to force reload
+                current_settings.named_config = None
+            
+            # Update scope option if provided
+            if cli_args.get("scope"):
+                current_settings.cli_args["scope"] = cli_args["scope"]
+                current_settings.context["current_scope"] = cli_args["scope"]
+            
+            # Reload configurations and rebuild context with updated settings
+            current_settings._load_configurations()
+            current_settings._build_runtime_context()
+        
+        return ctx
     except RuntimeError:
+        # Initialize new context manager if not already initialized
         return ContextManager.initialize(cli_args)

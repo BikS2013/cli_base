@@ -9,6 +9,7 @@ from typing import Optional
 from cli_base.extensibility.llm_extension import get_llm_profile_manager
 from cli_base.utils.formatting import OutputFormatter
 from cli_base.utils.context import _initialize_context
+from cli_base.commands.cmd_options import global_scope_options
 from langchain_core.messages import HumanMessage
 
 @click.group("generate")
@@ -22,15 +23,20 @@ def generate_group():
 @click.option("--stream/--no-stream", default=True, help="Stream the response (default: True)")
 @click.option("--max-tokens", type=int, help="Override max tokens for this request")
 @click.option("--temperature", type=float, help="Override temperature for this request")
+@global_scope_options
 def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = True, 
-                   max_tokens: Optional[int] = None, temperature: Optional[float] = None):
+                   max_tokens: Optional[int] = None, temperature: Optional[float] = None,
+                   scope: Optional[str] = None, file_path: Optional[str] = None):
     """
     Generate a response from an LLM using the given prompt.
     
     Uses either the specified profile or the default profile.
     """
-    # Initialize context
-    _initialize_context({})
+    # Initialize context with current cli arguments
+    _initialize_context({
+        "scope": scope,
+        "file_path": file_path
+    })
     
     try:
         # Get the profile manager
@@ -38,18 +44,37 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
         
         # Get profile name to use
         if not profile:
+            # This will check across all configuration scopes
             default_profile = profile_manager.get_default_profile()
             if not default_profile:
-                OutputFormatter.print_error("No LLM profile specified and no default profile set.")
-                OutputFormatter.print_info("Use: cli-tool llm use <profile-name> to set a default")
+                OutputFormatter.print_error("No LLM profile specified and no default profile set in any configuration scope.")
+                OutputFormatter.print_info("Use: cli-tool llm create <name> --provider <provider> --model <model> --api-key <key> to create a profile")
+                OutputFormatter.print_info("Then use: cli-tool llm use <profile-name> to set it as default")
                 return
             profile = default_profile
             OutputFormatter.print_info(f"Using default profile: {profile}")
         
-        # Get the profile data
-        profile_data = profile_manager.get_profile(profile)
-        if not profile_data:
-            OutputFormatter.print_error(f"Profile '{profile}' not found.")
+        try:
+            # Get the profile data - this will check across all configuration scopes
+            profile_data = profile_manager.get_profile(profile)
+        except ValueError as e:
+            OutputFormatter.print_error(f"Profile '{profile}' not found in any configuration scope.")
+            OutputFormatter.print_info("Available profiles:")
+            
+            # List profiles from all scopes
+            config_scopes = ["global", "local"]
+            current_scope = ContextManager.get_instance().settings.context.get("current_scope")
+            if current_scope == "file":
+                config_scopes.append("file")
+                
+            # Show profiles from each scope
+            for scope in config_scopes:
+                try:
+                    profiles = profile_manager.list_profiles(scope)
+                    if profiles:
+                        OutputFormatter.print_info(f"  {scope} profiles: {', '.join(profiles.keys())}")
+                except Exception:
+                    pass
             return
         
         # Apply overrides if specified
@@ -84,14 +109,18 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
 
 @generate_group.command("chat")
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
-def interactive_chat(profile: Optional[str] = None):
+@global_scope_options
+def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None, file_path: Optional[str] = None):
     """
     Start an interactive chat session with an LLM.
     
     Press Ctrl+D or type 'exit' to end the session.
     """
-    # Initialize context
-    _initialize_context({})
+    # Initialize context with current cli arguments
+    _initialize_context({
+        "scope": scope,
+        "file_path": file_path
+    })
     
     try:
         # Get the profile manager
@@ -99,16 +128,38 @@ def interactive_chat(profile: Optional[str] = None):
         
         # Get profile name to use
         if not profile:
+            # This will check across all configuration scopes
             default_profile = profile_manager.get_default_profile()
             if not default_profile:
-                OutputFormatter.print_error("No LLM profile specified and no default profile set.")
-                OutputFormatter.print_info("Use: cli-tool llm use <profile-name> to set a default")
+                OutputFormatter.print_error("No LLM profile specified and no default profile set in any configuration scope.")
+                OutputFormatter.print_info("Use: cli-tool llm create <name> --provider <provider> --model <model> --api-key <key> to create a profile")
+                OutputFormatter.print_info("Then use: cli-tool llm use <profile-name> to set it as default")
                 return
             profile = default_profile
             OutputFormatter.print_info(f"Using default profile: {profile}")
         
-        # Get the LLM
-        llm = profile_manager.get_llm(profile)
+        try:
+            # Get the LLM - this will check across all configuration scopes
+            llm = profile_manager.get_llm(profile)
+        except ValueError as e:
+            OutputFormatter.print_error(str(e))
+            OutputFormatter.print_info("Available profiles:")
+            
+            # List profiles from all scopes
+            config_scopes = ["global", "local"]
+            current_scope = ContextManager.get_instance().settings.context.get("current_scope")
+            if current_scope == "file":
+                config_scopes.append("file")
+                
+            # Show profiles from each scope
+            for scope in config_scopes:
+                try:
+                    profiles = profile_manager.list_profiles(scope)
+                    if profiles:
+                        OutputFormatter.print_info(f"  {scope} profiles: {', '.join(profiles.keys())}")
+                except Exception:
+                    pass
+            return
         
         # Start chat session
         OutputFormatter.print_info("Starting chat session (press Ctrl+D or type 'exit' to end)")

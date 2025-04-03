@@ -204,6 +204,9 @@ class LLMProfileManager(BaseProfileManager):
         """
         Get a LangChain LLM instance from a profile.
         
+        This method will search for the profile across all configuration scopes
+        following the precedence rules.
+        
         Args:
             profile_name: Name of the profile to use. If None, uses the default profile.
             
@@ -218,19 +221,21 @@ class LLMProfileManager(BaseProfileManager):
         if profile_name is None:
             profile_name = self.get_default_profile()
             if not profile_name:
-                raise ValueError("No default LLM profile set")
+                raise ValueError("No default LLM profile set in any configuration scope")
         
         # Get profile data
-        profile = self.get_profile(profile_name)
-        if not profile:
-            raise ValueError(f"LLM profile not found: {profile_name}")
-        
-        # Create LLM instance
         try:
-            from cli_base.llm.adapter import LLMAdapter
-            return LLMAdapter.create_llm(profile)
-        except ImportError as e:
-            raise ImportError(f"LangChain not installed. Please install LangChain to use this feature: {str(e)}")
+            profile = self.get_profile(profile_name)
+            
+            # Create LLM instance
+            try:
+                from cli_base.llm.adapter import LLMAdapter
+                return LLMAdapter.create_llm(profile)
+            except ImportError as e:
+                raise ImportError(f"LangChain not installed. Please install LangChain to use this feature: {str(e)}")
+        except ValueError as e:
+            # Re-raise with a more helpful message
+            raise ValueError(f"LLM profile '{profile_name}' not found in any configuration scope. Use 'cli-tool llm list' to see available profiles, or create one with 'cli-tool llm create'.")
 
 # Create a factory function for the profile manager
 def get_llm_profile_manager() -> LLMProfileManager:
