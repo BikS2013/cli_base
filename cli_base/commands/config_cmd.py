@@ -6,8 +6,9 @@ Handles configuration file operations.
 import json
 import click
 from typing import Optional, Dict, Any
-from ..utils.context import ContextManager
+from ..utils.context import ContextManager, initialize_context
 from ..utils.formatting import OutputFormatter
+from ..utils.param_resolver import with_resolved_params
 
 
 @click.group(name="config")
@@ -20,9 +21,13 @@ def config_group():
 @click.option("--global", "scope", flag_value="global", help="Use global configuration.")
 @click.option("--local", "scope", flag_value="local", help="Use local configuration.")
 @click.option("--file", "file_path", type=str, help="Use named configuration file.")
-def show_config(scope: str, file_path: Optional[str] = None):
+@with_resolved_params
+def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
     """Display configuration content."""
-    # Update context with command-specific arguments
+    # Initialize context with our parameters
+    initialize_context({"scope": scope, "file_path": file_path})
+    
+    # Get context and settings
     ctx = ContextManager.get_instance()
     rt = ctx.settings
     
@@ -139,7 +144,7 @@ def import_config(from_scope: str, from_file: Optional[str], to_scope: str, to_f
         
         # Set up CLI args for source
         if from_file:
-            # Initialize a temporary RTSettings for the from-file
+            # Initialize a temporary settings object for the from-file
             temp_settings = ContextManager.initialize({"file_path": from_file})
             source_scope = "file"
             source_config = temp_settings.settings.get_config("file")
@@ -200,7 +205,7 @@ def export_config(from_scope: str, from_file: Optional[str], to_file: str):
         
         # Load source configuration
         if from_file:
-            # Initialize a temporary RTSettings for the from-file
+            # Initialize a temporary settings object for the from-file
             temp_settings = ContextManager.initialize({"file_path": from_file})
             source_config = temp_settings.settings.get_config("file")
         else:

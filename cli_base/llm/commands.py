@@ -8,9 +8,9 @@ from typing import Optional
 
 from cli_base.extensibility.llm_extension import get_llm_profile_manager
 from cli_base.utils.formatting import OutputFormatter
-from cli_base.utils.context import _initialize_context, ContextManager
-from cli_base.commands.cmd_options import global_scope_options
-from cli_base.utils.param_resolver import with_resolved_params, resolve_params
+from cli_base.utils.context import ContextManager, initialize_context
+from cli_base.utils.advanced_settings import get_parameter_value
+from cli_base.utils.param_resolver import with_resolved_params
 from langchain_core.messages import HumanMessage
 
 @click.group("generate")
@@ -24,7 +24,9 @@ def generate_group():
 @click.option("--stream/--no-stream", default=True, help="Stream the response (default: True)")
 @click.option("--max-tokens", type=int, help="Override max tokens for this request")
 @click.option("--temperature", type=float, help="Override temperature for this request")
-@global_scope_options
+@click.option("--global", "scope", flag_value="global", help="Use global configuration")
+@click.option("--local", "scope", flag_value="local", is_flag=True, help="Use local configuration")
+@click.option("--file", "file_path", type=str, help="Use named configuration file")
 @with_resolved_params
 def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = True, 
                    max_tokens: Optional[int] = None, temperature: Optional[float] = None,
@@ -34,44 +36,38 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
     
     Uses either the specified profile or the default profile.
     """
-    # Parameters are already resolved by the decorator, so no need to initialize context manually
-    # The decorator has already:
-    # 1. Extracted scope parameters
-    # 2. Initialized/updated the context
-    # 3. Resolved the profile parameter if not provided
-    # 4. Made all parameters available
+    # Initialize context if not already initialized
+    try:
+        scope_params = {"scope": scope, "file_path": file_path}
+        initialize_context(scope_params)
+    except Exception as e:
+        OutputFormatter.print_error(f"Error initializing context: {str(e)}")
     
     try:
         # Get the profile manager
         profile_manager = get_llm_profile_manager()
         
-        # Get profile name to use
+        # Profile parameter is automatically resolved by @with_resolved_params
+        # If not provided, it will automatically use the default profile
+        
         if not profile:
-            # This will check across all configuration scopes
+            # Check if there's a default profile
             default_profile = profile_manager.get_default_profile()
             if not default_profile:
-                OutputFormatter.print_error("No LLM profile specified and no default profile set in any configuration scope.")
+                OutputFormatter.print_error("No LLM profile specified and no default profile set.")
                 OutputFormatter.print_info("Use: cli-tool llm create <name> --provider <provider> --model <model> --api-key <key> to create a profile")
                 OutputFormatter.print_info("Then use: cli-tool llm use <profile-name> to set it as default")
                 return
             profile = default_profile
             OutputFormatter.print_info(f"Using default profile: {profile}")
         
+        # Get profile data - will throw error if not found
         try:
-            # Get the profile data - this will check across all configuration scopes
             profile_data = profile_manager.get_profile(profile)
-        except ValueError as e:
-            OutputFormatter.print_error(f"Profile '{profile}' not found in any configuration scope.")
-            OutputFormatter.print_info("Available profiles:")
-            
-            # List profiles from all scopes
-            config_scopes = ["global", "local"]
-            current_scope = ContextManager.get_instance().settings.context.get("current_scope")
-            if current_scope == "file":
-                config_scopes.append("file")
-                
-            # Show profiles from each scope
-            for scope in config_scopes:
+        except ValueError:
+            OutputFormatter.print_error(f"Profile '{profile}' not found.")
+            # Show available profiles
+            for scope in ["global", "local"]:
                 try:
                     profiles = profile_manager.list_profiles(scope)
                     if profiles:
@@ -112,7 +108,9 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
 
 @generate_group.command("chat")
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
-@global_scope_options
+@click.option("--global", "scope", flag_value="global", help="Use global configuration")
+@click.option("--local", "scope", flag_value="local", is_flag=True, help="Use local configuration")
+@click.option("--file", "file_path", type=str, help="Use named configuration file")
 @with_resolved_params
 def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None, file_path: Optional[str] = None):
     """
@@ -120,18 +118,22 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
     
     Press Ctrl+D or type 'exit' to end the session.
     """
-    # Parameters are already resolved by the decorator, so no need to initialize context manually
+    # Initialize context
+    try:
+        scope_params = {"scope": scope, "file_path": file_path}
+        initialize_context(scope_params)
+    except Exception as e:
+        OutputFormatter.print_error(f"Error initializing context: {str(e)}")
     
     try:
         # Get the profile manager
         profile_manager = get_llm_profile_manager()
         
-        # Get profile name to use
+        # Check if profile is provided or there's a default
         if not profile:
-            # This will check across all configuration scopes
             default_profile = profile_manager.get_default_profile()
             if not default_profile:
-                OutputFormatter.print_error("No LLM profile specified and no default profile set in any configuration scope.")
+                OutputFormatter.print_error("No LLM profile specified and no default profile set.")
                 OutputFormatter.print_info("Use: cli-tool llm create <name> --provider <provider> --model <model> --api-key <key> to create a profile")
                 OutputFormatter.print_info("Then use: cli-tool llm use <profile-name> to set it as default")
                 return
@@ -139,20 +141,14 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
             OutputFormatter.print_info(f"Using default profile: {profile}")
         
         try:
-            # Get the LLM - this will check across all configuration scopes
+            # Get the LLM
             llm = profile_manager.get_llm(profile)
         except ValueError as e:
             OutputFormatter.print_error(str(e))
             OutputFormatter.print_info("Available profiles:")
             
-            # List profiles from all scopes
-            config_scopes = ["global", "local"]
-            current_scope = ContextManager.get_instance().settings.context.get("current_scope")
-            if current_scope == "file":
-                config_scopes.append("file")
-                
-            # Show profiles from each scope
-            for scope in config_scopes:
+            # Show available profiles
+            for scope in ["global", "local"]:
                 try:
                     profiles = profile_manager.list_profiles(scope)
                     if profiles:

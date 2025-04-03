@@ -32,20 +32,9 @@ def cli(verbose: bool, quiet: bool, scope: str = None, file_path: str = None):
     
     Use commands like 'config', 'llm', and 'schema' to interact with the tool.
     """
-    # Initialize runtime settings with global CLI arguments
-    cli_args = {
-        "verbose": verbose,
-        "quiet": quiet,
-        "scope": scope,
-        "file_path": file_path
-    }
-    
-    try:
-        # Try to get existing context manager instance
-        ctx = ContextManager.get_instance()
-    except RuntimeError:
-        # Initialize new context manager
-        ctx = ContextManager.initialize(cli_args)
+    # Note: When using advanced settings, further initialization is handled
+    # by the advanced settings system called before this function
+    pass
 
 
 # Add command groups
@@ -64,13 +53,9 @@ from cli_base.utils.command_registry import CommandRegistry
 registry = CommandRegistry.get_instance()
 registry.register_commands_from_cli(cli)
 
-# Import advanced settings system (but don't activate it by default)
-from cli_base.utils.advanced_settings import (
-    AdvancedRTSettings, 
-    AdvancedContextManager,
-    initialize_advanced_context,
-    get_parameter_value
-)
+# Import settings system
+from cli_base.utils.advanced_settings import get_parameter_value
+from cli_base.utils.context import initialize_context
 from cli_base.utils.param_resolver import ParameterResolver
 
 
@@ -103,63 +88,32 @@ def help_command(command, subcommand):
         # Show general help
         click.echo(ctx.parent.get_help())
 
-def initialize_with_advanced_settings():
+def initialize_settings():
     """
-    Initialize the CLI with advanced settings instead of regular settings.
+    Initialize the CLI with settings.
     
-    This function replaces the standard context manager with the advanced
-    context manager, enabling command-specific configurations and enhanced
-    parameter resolution for all commands.
-    
-    Usage:
-        # At the beginning of the script:
-        if use_advanced_settings:
-            initialize_with_advanced_settings()
-            
-        # Then run the CLI:
-        cli()
+    This function initializes the context manager with settings,
+    enabling command-specific configurations and parameter resolution.
     """
     # Create a parameter resolver
     resolver = ParameterResolver()
     
-    # Create dummy Click context if running outside of Click
-    try:
-        click.get_current_context()
-    except RuntimeError:
-        # Create dummy Click context for initialization
-        ctx = click.Context(cli)
-        ctx.ensure_object(dict)
-        with ctx:
-            # Initialize advanced context
-            advanced_ctx = initialize_advanced_context(resolver=resolver)
-            
-            # Store reference to make it accessible
-            cli.advanced_context = advanced_ctx
+    # Initialize with default settings first to ensure we have a base configuration
+    scope_params = {"scope": "local"}  # Default to local scope
     
-    # Monkey patch ContextManager to use advanced settings
-    def get_instance_with_advanced():
-        """Get the advanced context manager instance instead of regular one."""
-        try:
-            # Try to get existing advanced context manager
-            return AdvancedContextManager.get_advanced_instance()
-        except RuntimeError:
-            # Initialize new advanced context manager
-            return AdvancedContextManager.initialize_advanced()
+    # Initialize context
+    ctx = initialize_context(scope_params, resolver=resolver)
     
-    # Replace ContextManager.get_instance with our version
-    ContextManager.get_instance = get_instance_with_advanced
+    # Store reference to make it accessible
+    cli.context = ctx
     
-    # Log that advanced settings are being used
+    # Log that settings are being used
     from cli_base.utils.formatting import OutputFormatter
-    OutputFormatter.print_info("Advanced settings system activated.")
+    OutputFormatter.print_info("Settings system activated.")
 
 if __name__ == "__main__":
-    # Check if advanced settings should be enabled
-    import os
-    use_advanced_settings = os.environ.get("CLI_USE_ADVANCED_SETTINGS", "").lower() in ("1", "true", "yes", "on")
+    # Always initialize settings
+    initialize_settings()
     
-    use_advanced_settings = True
-    if use_advanced_settings:
-        initialize_with_advanced_settings()
-    
+    # Run the CLI
     cli()

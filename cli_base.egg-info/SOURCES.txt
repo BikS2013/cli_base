@@ -9,6 +9,7 @@ cli_base.egg-info/entry_points.txt
 cli_base.egg-info/requires.txt
 cli_base.egg-info/top_level.txt
 cli_base/commands/__init__.py
+cli_base/commands/advanced_cmd.py
 cli_base/commands/cmd_options.py
 cli_base/commands/config_cmd.py
 cli_base/commands/generic_profile_cmd.py
@@ -22,9 +23,11 @@ cli_base/llm/adapter.py
 cli_base/llm/commands.py
 cli_base/llm/model_list.py
 cli_base/utils/__init__.py
+cli_base/utils/advanced_settings.py
 cli_base/utils/command_registry.py
 cli_base/utils/config.py
 cli_base/utils/context.py
 cli_base/utils/formatting.py
+cli_base/utils/param_resolver.py
 cli_base/utils/profiles.py
 cli_base/utils/rtsettings.py

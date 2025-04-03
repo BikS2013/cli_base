@@ -35,23 +35,6 @@ def scope_options(command):
         )(command)
     return command
 
-def global_scope_options(command):
-    """
-    Decorator to add scope options (--global, --local, --file) to any command.
-    This decorator is used to ensure consistent configuration handling across all commands.
-    """
-    for param in SCOPE_PARAMS:
-        command = click.option(
-            f"--{param['name']}", 
-            param['func_param'],
-            flag_value=param.get('flag_value', None) if 'flag_value' in param else None,
-            type=param['type'] if 'type' in param else None, 
-            default=param.get('default', None) if 'default' in param else None,
-            help=param['help'],
-            is_eager=True,  # Process these options before other options
-            expose_value=True,  # Make sure values are passed to the function
-        )(command)
-    return command
 
 #@click.argument("json_input", required=False)
 def json_input_argument(command):

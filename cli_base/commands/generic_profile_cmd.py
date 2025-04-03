@@ -6,7 +6,7 @@ from cli_base.commands.profile_parameter_processor import (
     EditProfileParameterProcessor, 
     ProfileParameterProcessor
 )
-from cli_base.utils.context import _initialize_context
+from cli_base.utils.context import initialize_context
 from cli_base.utils.formatting import OutputFormatter
 from cli_base.utils.profiles import ProfileManager
 
@@ -46,7 +46,7 @@ def create_profile(ext_name: str, ext_profilemanager: ProfileManager, json_input
     (scope, scope_params) = extract_scope_params(**kwargs)
 
     # Initialize context 
-    ctx = _initialize_context(scope_params)
+    ctx = initialize_context(scope_params)
     
     try:
         # Process parameters (from JSON or remaining keyword args)
@@ -72,7 +72,7 @@ def list_profiles(ext_name: str, ext_profilemanager: ProfileManager,
     (scope, scope_params) = get_scope_params(scope, file_path)
 
     # Initialize context 
-    ctx = _initialize_context(scope_params)
+    ctx = initialize_context(scope_params)
 
     try:
         # List profiles
@@ -113,7 +113,7 @@ def show_profile(ext_name:str, ext_profilemanager: ProfileManager,
     (scope, scope_params) = get_scope_params(scope, file_path)
 
     # Initialize context 
-    ctx = _initialize_context(scope_params)
+    ctx = initialize_context(scope_params)
     
     try:
         # Get profile
@@ -134,7 +134,7 @@ def edit_profile(ext_name:str, ext_profilemanager: ProfileManager,
     (scope, scope_params) = extract_scope_params(**kwargs)
 
     # Initialize context 
-    ctx = _initialize_context(scope_params)
+    ctx = initialize_context(scope_params)
     
     try:
         # Process parameters (from JSON or command-line args)
@@ -159,7 +159,7 @@ def delete_profile(ext_name:str, ext_profilemanager: ProfileManager,
     (scope, scope_params) = get_scope_params(scope, file_path)
 
     # Initialize context 
-    ctx = _initialize_context(scope_params)
+    ctx = initialize_context(scope_params)
     
     try:
         
@@ -175,7 +175,7 @@ def use_profile(ext_name: str, ext_profilemanager: ProfileManager,
     (scope, scope_params) = get_scope_params(scope, file_path)
 
     # Initialize context 
-    ctx = _initialize_context(scope_params)
+    ctx = initialize_context(scope_params)
 
     
     try:

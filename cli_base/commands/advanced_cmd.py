@@ -6,13 +6,10 @@ Demonstrates how to use the advanced parameter resolution system.
 import click
 from typing import Optional, Dict, Any
 
-from cli_base.utils.advanced_settings import (
-    AdvancedRTSettings, 
-    initialize_advanced_context, 
-    get_parameter_value
-)
+from cli_base.utils.advanced_settings import get_parameter_value
+from cli_base.utils.context import initialize_context
 from cli_base.utils.formatting import OutputFormatter
-from cli_base.commands.cmd_options import global_scope_options
+from cli_base.utils.param_resolver import with_resolved_params
 
 
 @click.group("advanced")
@@ -24,9 +21,8 @@ def advanced_group():
 @advanced_group.command("config")
 @click.argument("key", required=False)
 @click.argument("value", required=False)
-@global_scope_options
-def advanced_config(key: Optional[str] = None, value: Optional[str] = None, 
-                   scope: Optional[str] = None, file_path: Optional[str] = None):
+@with_resolved_params
+def advanced_config(key: Optional[str] = None, value: Optional[str] = None):
     """
     View or set command-specific configuration.
     
@@ -34,12 +30,9 @@ def advanced_config(key: Optional[str] = None, value: Optional[str] = None,
     If only KEY is provided, shows the value for that key.
     If both KEY and VALUE are provided, sets the value for that key.
     """
-    # Initialize advanced context
-    ctx = initialize_advanced_context({
-        "scope": scope,
-        "file_path": file_path
-    })
-    advanced_settings = ctx.advanced_settings
+    # Initialize context
+    ctx = initialize_context()
+    advanced_settings = ctx.settings
     
     # Get current command path
     command_path = advanced_settings.command_context.get("command_path")
@@ -112,24 +105,17 @@ def advanced_config(key: Optional[str] = None, value: Optional[str] = None,
 @click.option("--param1", help="Example parameter 1")
 @click.option("--param2", help="Example parameter 2")
 @click.option("--param3", type=int, help="Example parameter 3")
-@global_scope_options
+@with_resolved_params
 def advanced_exec(command_name: str, param1: Optional[str] = None, 
-                 param2: Optional[str] = None, param3: Optional[int] = None,
-                 scope: Optional[str] = None, file_path: Optional[str] = None):
+                 param2: Optional[str] = None, param3: Optional[int] = None):
     """
     Execute a command with resolved parameters.
     
     This command demonstrates how parameters are resolved from different sources.
     """
-    # Initialize advanced context
-    ctx = initialize_advanced_context({
-        "scope": scope,
-        "file_path": file_path,
-        "param1": param1,
-        "param2": param2,
-        "param3": param3
-    })
-    advanced_settings = ctx.advanced_settings
+    # Initialize context
+    ctx = initialize_context()
+    advanced_settings = ctx.settings
     
     # Get parameters using advanced parameter resolution
     resolved_param1 = get_parameter_value("param1", "default1")

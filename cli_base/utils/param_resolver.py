@@ -6,8 +6,7 @@ Handles the retrieval and preparation of all parameters needed for command execu
 import click
 from typing import Any, Dict, Optional, List, Callable, TypeVar, Union, Set
 import inspect
-from .context import ContextManager, _initialize_context
-from .rtsettings import RTSettings
+from .context import ContextManager, initialize_context
 
 # Type variable for the command function
 CommandFunc = TypeVar('CommandFunc', bound=Callable)
@@ -44,6 +43,9 @@ class ParameterResolver:
         # Get the command object from the context
         command = ctx.command
         
+        # Store the original Click context
+        original_click_context = ctx
+        
         # Initialize parameters with the ones already in the context
         params = dict(ctx.params)
         
@@ -51,14 +53,16 @@ class ParameterResolver:
         scope_params = self._extract_scope_params(params)
         
         # Initialize or update context manager with scope parameters
-        _initialize_context(scope_params)
+        initialize_context(scope_params)
         
-        # Get the effective configuration
+        # Get the settings from the context
         rt_settings = ContextManager.get_instance().settings
+            
         effective_config = rt_settings.get_effective_config()
         
         # Get command-specific parameters from configuration if available
-        command_path = self._get_command_path(ctx)
+        # Use the original Click context for the command path
+        command_path = self._get_command_path(original_click_context)
         config_params = self._get_config_params_for_command(effective_config, command_path)
         
         # Merge parameters with configuration values for missing parameters
@@ -113,13 +117,22 @@ class ParameterResolver:
         Returns:
             String representation of the command path (e.g., "generate.prompt")
         """
+        # Safety check to ensure we have a proper Click context
+        if not isinstance(ctx, click.Context):
+            return ""  # Return empty path if not a proper Click context
+            
         command_path = []
         current = ctx
         
         # Walk up the context hierarchy to build the full command path
-        while current is not None:
-            if current.info_name and current.info_name != 'cli':  # Skip the main CLI
+        while current is not None and isinstance(current, click.Context):
+            if hasattr(current, 'info_name') and current.info_name and current.info_name != 'cli':  # Skip the main CLI
                 command_path.insert(0, current.info_name)
+            
+            # Safety check for parent attribute
+            if not hasattr(current, 'parent'):
+                break
+                
             current = current.parent
             
         return ".".join(command_path)
