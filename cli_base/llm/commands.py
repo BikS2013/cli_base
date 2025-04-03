@@ -8,8 +8,9 @@ from typing import Optional
 
 from cli_base.extensibility.llm_extension import get_llm_profile_manager
 from cli_base.utils.formatting import OutputFormatter
-from cli_base.utils.context import _initialize_context
+from cli_base.utils.context import _initialize_context, ContextManager
 from cli_base.commands.cmd_options import global_scope_options
+from cli_base.utils.param_resolver import with_resolved_params, resolve_params
 from langchain_core.messages import HumanMessage
 
 @click.group("generate")
@@ -24,6 +25,7 @@ def generate_group():
 @click.option("--max-tokens", type=int, help="Override max tokens for this request")
 @click.option("--temperature", type=float, help="Override temperature for this request")
 @global_scope_options
+@with_resolved_params
 def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = True, 
                    max_tokens: Optional[int] = None, temperature: Optional[float] = None,
                    scope: Optional[str] = None, file_path: Optional[str] = None):
@@ -32,11 +34,12 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
     
     Uses either the specified profile or the default profile.
     """
-    # Initialize context with current cli arguments
-    _initialize_context({
-        "scope": scope,
-        "file_path": file_path
-    })
+    # Parameters are already resolved by the decorator, so no need to initialize context manually
+    # The decorator has already:
+    # 1. Extracted scope parameters
+    # 2. Initialized/updated the context
+    # 3. Resolved the profile parameter if not provided
+    # 4. Made all parameters available
     
     try:
         # Get the profile manager
@@ -110,17 +113,14 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
 @generate_group.command("chat")
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
 @global_scope_options
+@with_resolved_params
 def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None, file_path: Optional[str] = None):
     """
     Start an interactive chat session with an LLM.
     
     Press Ctrl+D or type 'exit' to end the session.
     """
-    # Initialize context with current cli arguments
-    _initialize_context({
-        "scope": scope,
-        "file_path": file_path
-    })
+    # Parameters are already resolved by the decorator, so no need to initialize context manually
     
     try:
         # Get the profile manager

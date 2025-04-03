@@ -25,6 +25,14 @@ class ConfigManager:
             "output_format": "json",
             "color_theme": "dark",
             "log_level": "info"
+        },
+        "commands": {
+            # Command-specific default parameters
+            # For example:
+            # "generate.prompt": {
+            #     "stream": True,
+            #     "temperature": 0.7
+            # }
         }
     }
 
