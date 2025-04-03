@@ -11,6 +11,7 @@ from cli_base.utils.formatting import OutputFormatter
 from cli_base.utils.context import ContextManager, initialize_context
 from cli_base.utils.advanced_settings import get_parameter_value
 from cli_base.utils.param_resolver import with_resolved_params
+from cli_base.commands.cmd_options import scope_options
 from langchain_core.messages import HumanMessage
 
 @click.group("generate")
@@ -24,9 +25,7 @@ def generate_group():
 @click.option("--stream/--no-stream", default=True, help="Stream the response (default: True)")
 @click.option("--max-tokens", type=int, help="Override max tokens for this request")
 @click.option("--temperature", type=float, help="Override temperature for this request")
-@click.option("--global", "scope", flag_value="global", help="Use global configuration")
-@click.option("--local", "scope", flag_value="local", is_flag=True, help="Use local configuration")
-@click.option("--file", "file_path", type=str, help="Use named configuration file")
+@scope_options
 @with_resolved_params
 def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = True, 
                    max_tokens: Optional[int] = None, temperature: Optional[float] = None,
@@ -108,9 +107,7 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
 
 @generate_group.command("chat")
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
-@click.option("--global", "scope", flag_value="global", help="Use global configuration")
-@click.option("--local", "scope", flag_value="local", is_flag=True, help="Use local configuration")
-@click.option("--file", "file_path", type=str, help="Use named configuration file")
+@scope_options
 @with_resolved_params
 def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None, file_path: Optional[str] = None):
     """

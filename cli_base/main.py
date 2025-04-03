@@ -8,6 +8,7 @@ from cli_base.commands.config_cmd import config_group
 from cli_base.extensibility.llm_extension import llm_group
 from cli_base.commands.schema_cmd import schema_group
 from cli_base.commands.advanced_cmd import advanced_command
+from cli_base.commands.cmd_options import scope_options
 from cli_base.utils.context import ContextManager
 from cli_base.utils.formatting import OutputFormatter
 
@@ -23,9 +24,7 @@ except ImportError:
 @click.version_option()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress non-essential output")
-@click.option("--global", "scope", flag_value="global", help="Use global configuration")
-@click.option("--local", "scope", flag_value="local", is_flag=True, help="Use local configuration")
-@click.option("--file", "file_path", type=str, help="Use named configuration file")
+@scope_options
 def cli(verbose: bool, quiet: bool, scope: str = None, file_path: str = None):
     """
     Universal CLI template with standardized commands, profiles, and configuration management.

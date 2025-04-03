@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any
 from ..utils.context import ContextManager, initialize_context
 from ..utils.formatting import OutputFormatter
 from ..utils.param_resolver import with_resolved_params
+from .cmd_options import scope_options
 
 
 @click.group(name="config")
@@ -18,9 +19,7 @@ def config_group():
 
 
 @config_group.command(name="show")
-@click.option("--global", "scope", flag_value="global", help="Use global configuration.")
-@click.option("--local", "scope", flag_value="local", help="Use local configuration.")
-@click.option("--file", "file_path", type=str, help="Use named configuration file.")
+@scope_options
 @with_resolved_params
 def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
     """Display configuration content."""
@@ -46,9 +45,7 @@ def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
 
 
 @config_group.command(name="save")
-@click.option("--global", "scope", flag_value="global", help="Use global configuration.")
-@click.option("--local", "scope", flag_value="local", default=True, help="Use local configuration.")
-@click.option("--file", "file_path", type=str, help="Use named configuration file.")
+@scope_options
 def save_config(scope: str, file_path: Optional[str] = None):
     """Save current parameters to configuration."""
     # Get runtime settings
@@ -65,9 +62,7 @@ def save_config(scope: str, file_path: Optional[str] = None):
 
 
 @config_group.command(name="update")
-@click.option("--global", "scope", flag_value="global", help="Use global configuration.")
-@click.option("--local", "scope", flag_value="local", default=True, help="Use local configuration.")
-@click.option("--file", "file_path", type=str, help="Use named configuration file.")
+@scope_options
 @click.argument("update_json", required=True)
 def update_config(scope: str, update_json: str, file_path: Optional[str] = None):
     """Update configuration with current parameters."""
@@ -93,9 +88,7 @@ def update_config(scope: str, update_json: str, file_path: Optional[str] = None)
 
 
 @config_group.command(name="replace")
-@click.option("--global", "scope", flag_value="global", help="Use global configuration.")
-@click.option("--local", "scope", flag_value="local", default=True, help="Use local configuration.")
-@click.option("--file", "file_path", type=str, help="Use named configuration file.")
+@scope_options
 @click.argument("config_json", required=True)
 def replace_config(scope: str, config_json: str, file_path: Optional[str] = None):
     """Replace entire configuration with current parameters."""
@@ -221,9 +214,7 @@ def export_config(from_scope: str, from_file: Optional[str], to_file: str):
 
 
 @config_group.command(name="reset")
-@click.option("--global", "scope", flag_value="global", help="Reset global configuration.")
-@click.option("--local", "scope", flag_value="local", help="Reset local configuration.")
-@click.option("--file", "file_path", type=str, help="Reset named configuration file.")
+@scope_options
 @click.confirmation_option(prompt="Are you sure you want to reset the configuration?")
 def reset_config(scope: str, file_path: Optional[str] = None):
     """Reset configuration to defaults."""
@@ -246,9 +237,7 @@ def reset_config(scope: str, file_path: Optional[str] = None):
 
 
 @config_group.command(name="generate")
-@click.option("--global", "scope", flag_value="global", help="Generate from global configuration.")
-@click.option("--local", "scope", flag_value="local", help="Generate from local configuration.")
-@click.option("--file", "file_path", type=str, help="Generate from named configuration file.")
+@scope_options
 def generate_config(scope: str, file_path: Optional[str] = None):
     """Generate command-line instructions based on configuration."""
     # Get runtime settings
