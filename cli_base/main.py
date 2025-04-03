@@ -31,9 +31,12 @@ def cli(verbose: bool, quiet: bool, scope: str = None, file_path: str = None):
     
     Use commands like 'config', 'llm', and 'schema' to interact with the tool.
     """
-    # Note: When using advanced settings, further initialization is handled
-    # by the advanced settings system called before this function
-    pass
+    # Set verbose mode in OutputFormatter
+    from cli_base.utils.formatting import OutputFormatter
+    OutputFormatter.set_verbose(verbose)
+    
+    # If verbose mode is enabled, display the runtime settings
+    # (This will happen after command execution - we'll add explicit calls in each command)
 
 
 # Add command groups
@@ -100,6 +103,14 @@ def initialize_settings():
     # Initialize with default settings first to ensure we have a base configuration
     scope_params = {"scope": "local"}  # Default to local scope
     
+    # Check for verbose flag in sys.argv
+    import sys
+    verbose = "-v" in sys.argv or "--verbose" in sys.argv
+    
+    # Set verbose mode in OutputFormatter
+    from cli_base.utils.formatting import OutputFormatter
+    OutputFormatter.set_verbose(verbose)
+    
     # Initialize context
     ctx = initialize_context(scope_params, resolver=resolver)
     
@@ -107,7 +118,6 @@ def initialize_settings():
     cli.context = ctx
     
     # Log that settings are being used
-    from cli_base.utils.formatting import OutputFormatter
     OutputFormatter.print_info("Settings system activated.")
 
 if __name__ == "__main__":

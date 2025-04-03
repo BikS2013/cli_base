@@ -27,6 +27,14 @@ def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
     ctx = ContextManager.get_instance()
     rt = ctx.settings
     
+    # Detect verbose mode and set it
+    verbose = OutputFormatter.detect_verbose_mode()
+    
+    # Print verbose information if enabled
+    OutputFormatter.print_command_verbose_info("config show", 
+                                              scope=scope, 
+                                              file_path=file_path)
+    
     # Validate scope + file_path combination
     if scope is None and file_path is None:
         scope = "local"  # Default to local if not specified
@@ -39,6 +47,9 @@ def show_config(scope: Optional[str] = None, file_path: Optional[str] = None):
         OutputFormatter.print_json(config, f"{scope.capitalize()} Configuration")
     except (FileNotFoundError, ValueError) as e:
         OutputFormatter.print_error(str(e))
+    
+    # Print runtime settings at the end if verbose mode is enabled
+    OutputFormatter.end_command_with_runtime_settings(include_configs=False)
 
 
 @standard_command()
@@ -274,3 +285,5 @@ def generate_config(scope: str, file_path: Optional[str] = None):
         
     except (ValueError, IOError, FileNotFoundError) as e:
         OutputFormatter.print_error(str(e))
+
+

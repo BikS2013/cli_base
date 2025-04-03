@@ -144,7 +144,8 @@ def standard_command(init_context: bool = True) -> Callable[[CommandFunc], Comma
                     from ..utils.formatting import OutputFormatter
                     OutputFormatter.print_error(f"Error initializing context: {str(e)}")
             
-            # Call the original function
+            # Call the original function and return the result
+            # (Runtime settings will be printed by the command if verbose mode is enabled)
             return func(*args, **kwargs)
         
         # Return either the context wrapper or the param resolver + context wrapper

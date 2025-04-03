@@ -70,6 +70,9 @@ cli-tool config import --from-file "~/my-configs/special.json" --to-local
 
 # Update configuration with current parameters
 cli-tool config update --global '{"settings": {"log_level": "debug"}}'
+
+# Enable verbose output to see runtime settings
+cli-tool -v config show
 ```
 
 ### LLM Profile Management

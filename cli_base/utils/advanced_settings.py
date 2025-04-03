@@ -694,6 +694,110 @@ class AdvancedRTSettings:
             # Save updated configuration
             self.save_config(effective_config, scope)
     
+    def to_json(self, include_paths: bool = True, include_configs: bool = True, 
+               include_context: bool = True, include_cli_args: bool = True) -> Dict[str, Any]:
+        """
+        Produce a complete JSON representation of the current state.
+        
+        Args:
+            include_paths: Whether to include file paths in the output
+            include_configs: Whether to include raw configurations in the output
+            include_context: Whether to include the runtime context in the output
+            include_cli_args: Whether to include CLI arguments in the output
+            
+        Returns:
+            Dictionary representing the complete state, ready for JSON serialization
+        """
+        import os
+        import sys
+        from pathlib import Path
+        import copy
+        
+        # Initialize result dictionary with the most important information first
+        result = {}
+        
+        # ===== Basic Settings Status =====
+        result["current_scope"] = self.context.get("current_scope", "unknown")
+        result["verbose"] = self.verbose
+        result["quiet"] = self.quiet
+        
+        # ===== Configuration Status =====
+        result["config_status"] = {
+            "global_exists": self.global_config_path.exists(),
+            "local_exists": self.local_config_path.exists(),
+            "named_exists": self.named_config_path.exists() if self.named_config_path else False
+        }
+        
+        # ===== Command Context =====
+        # Add command context early in the output for better visibility
+        result["command_context"] = self.command_context
+        
+        # ===== CLI Arguments =====
+        # Add CLI arguments if requested
+        if include_cli_args:
+            # Show command line arguments
+            result["sys_argv"] = sys.argv
+            
+            # Show parsed CLI arguments
+            result["cli_args"] = {
+                k: v for k, v in self.cli_args.items() 
+                if k != "sys.argv" and v is not None
+            }
+        
+        # ===== File Paths =====
+        # Add file paths if requested
+        if include_paths:
+            result["paths"] = {
+                "global_config_dir": str(self.global_config_dir),
+                "global_config_path": str(self.global_config_path),
+                "local_config_dir": str(self.local_config_dir),
+                "local_config_path": str(self.local_config_path),
+            }
+            
+            if self.named_config_path:
+                result["paths"]["named_config_path"] = str(self.named_config_path)
+                
+        # ===== Effective Configuration =====
+        # Add runtime context if requested (showing the effective configuration)
+        if include_context:
+            # Make a deep copy to avoid modifying the original
+            context_copy = copy.deepcopy(self.context)
+            
+            # Remove CLI args if not requested (they'll be added separately)
+            if not include_cli_args and "cli_args" in context_copy:
+                del context_copy["cli_args"]
+            
+            # Show only the most important parts of the context
+            result["effective_config"] = {}
+            
+            # Add settings
+            if "settings" in context_copy:
+                result["effective_config"]["settings"] = context_copy["settings"]
+                
+            # Add default profiles
+            if "defaults" in context_copy:
+                result["effective_config"]["defaults"] = context_copy["defaults"]
+                
+            # Add available profiles (just the names)
+            if "profiles" in context_copy:
+                profiles_summary = {}
+                for profile_type, profiles in context_copy["profiles"].items():
+                    profiles_summary[profile_type] = list(profiles.keys())
+                result["effective_config"]["profile_names"] = profiles_summary
+        
+        # ===== Raw Configurations =====
+        # Add raw configurations if requested
+        if include_configs:
+            result["raw_configs"] = {
+                "global": self.global_config,
+                "local": self.local_config,
+            }
+            
+            if self.named_config:
+                result["raw_configs"]["named"] = self.named_config
+        
+        return result
+    
     @staticmethod
     def _deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
         """Deep merge two dictionaries."""

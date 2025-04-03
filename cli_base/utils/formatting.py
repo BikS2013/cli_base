@@ -37,6 +37,14 @@ console = Console(theme=cli_theme)
 class OutputFormatter:
     """Formats CLI output with color and structure."""
     
+    # Class variable to track verbose mode
+    verbose_mode = False
+    
+    @classmethod
+    def set_verbose(cls, verbose: bool):
+        """Set verbose mode for the output formatter."""
+        cls.verbose_mode = verbose
+    
     @staticmethod
     def print_success(message: str) -> None:
         """Print a success message in green."""
@@ -206,6 +214,92 @@ class OutputFormatter:
         options_section.add("[option]--quiet, -q[/option]         [value]Suppress non-essential output[/value]")
         
         console.print(tree)
+    
+    @classmethod
+    def print_runtime_settings(cls, include_configs: bool = False):
+        """
+        Print the runtime settings JSON representation when in verbose mode.
+        
+        Args:
+            include_configs: Whether to include raw configurations in the output
+        """
+        if not cls.verbose_mode:
+            return
+            
+        try:
+            # This import is inside the function to avoid circular imports
+            # We need to use absolute import to make sure it works in all contexts
+            import importlib
+            context_module = importlib.import_module('cli_base.utils.context') 
+            ContextManager = context_module.ContextManager
+            
+            # Get the context and settings
+            ctx = ContextManager.get_instance()
+            rt = ctx.settings
+            
+            # Generate a JSON representation of the settings
+            status_json = rt.to_json(
+                include_paths=True,
+                include_configs=include_configs,
+                include_context=True,
+                include_cli_args=True
+            )
+            
+            # Print the JSON with a title and double box for emphasis
+            from rich import box
+            cls.print_json(status_json, "Runtime Settings (Verbose Mode)")
+        except Exception as e:
+            cls.print_warning(f"Could not display runtime settings: {str(e)}")
+            
+    @classmethod
+    def detect_verbose_mode(cls):
+        """Detect verbose mode from command line arguments and set it."""
+        import sys
+        verbose = "-v" in sys.argv or "--verbose" in sys.argv
+        cls.set_verbose(verbose)
+        return verbose
+        
+    @classmethod
+    def print_command_verbose_info(cls, command_name, **kwargs):
+        """Print verbose debug information about a command."""
+        if not cls.verbose_mode:
+            return
+            
+        cls.print_info(f"Verbose mode detected: {cls.verbose_mode}")
+        
+        import sys
+        cls.print_info(f"System arguments: {sys.argv}")
+        cls.print_info(f"Command: {command_name}")
+        
+        # Print all keyword arguments
+        for key, value in kwargs.items():
+            cls.print_info(f"{key}: {value}")
+            
+    @classmethod
+    def end_command_with_runtime_settings(cls, include_configs=False):
+        """Print runtime settings at the end of a command if verbose mode is enabled."""
+        if not cls.verbose_mode:
+            return
+            
+        try:
+            # Get the context and settings
+            import importlib
+            context_module = importlib.import_module('cli_base.utils.context') 
+            ContextManager = context_module.ContextManager
+            
+            ctx = ContextManager.get_instance()
+            rt = ctx.settings
+            
+            # Get a fresh copy of the runtime settings
+            status_json = rt.to_json(include_configs=include_configs)
+            
+            # Print a divider
+            console.print("\n" + "=" * 80 + "\n", style="blue")
+            
+            # Print the JSON with a title
+            cls.print_json(status_json, "Runtime Settings (Verbose Mode)")
+        except Exception as e:
+            cls.print_warning(f"Could not display runtime settings: {str(e)}")
     
     @staticmethod
     def print_profile(profile: Dict[str, Any], name: str, profile_type: str = "LLM") -> None:

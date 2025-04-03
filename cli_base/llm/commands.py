@@ -12,7 +12,7 @@ from cli_base.utils.context import ContextManager, initialize_context
 from cli_base.utils.advanced_settings import get_parameter_value
 from cli_base.utils.param_resolver import with_resolved_params
 from cli_base.commands.cmd_options import scope_options, standard_command
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 @click.group("generate")
 def generate_group():
@@ -36,6 +36,19 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
     """
     # Context is already initialized by standard_command
     
+    # Detect verbose mode and set it
+    verbose = OutputFormatter.detect_verbose_mode()
+    
+    # Print verbose information if enabled
+    OutputFormatter.print_command_verbose_info("generate prompt", 
+                                             prompt=prompt,
+                                             profile=profile,
+                                             stream=stream,
+                                             max_tokens=max_tokens,
+                                             temperature=temperature,
+                                             scope=scope,
+                                             file_path=file_path)
+    
     try:
         # Get the profile manager
         profile_manager = get_llm_profile_manager()
@@ -48,7 +61,7 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
             default_profile = profile_manager.get_default_profile()
             if not default_profile:
                 OutputFormatter.print_error("No LLM profile specified and no default profile set.")
-                OutputFormatter.print_info("Use: cli-tool llm create <name> --provider <provider> --model <model> --api-key <key> to create a profile")
+                OutputFormatter.print_info("Use: cli-tool llm create <n> --provider <provider> --model <model> --api-key <key> to create a profile")
                 OutputFormatter.print_info("Then use: cli-tool llm use <profile-name> to set it as default")
                 return
             profile = default_profile
@@ -98,6 +111,9 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
         OutputFormatter.print_info("Install LangChain with: pip install langchain-core langchain-openai")
     except Exception as e:
         OutputFormatter.print_error(f"Error: {str(e)}")
+    
+    # Print runtime settings at the end if verbose mode is enabled
+    OutputFormatter.end_command_with_runtime_settings(include_configs=False)
 
 @standard_command()
 @generate_group.command("chat")
@@ -110,6 +126,15 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
     """
     # Context is already initialized by standard_command
     
+    # Detect verbose mode and set it
+    verbose = OutputFormatter.detect_verbose_mode()
+    
+    # Print verbose information if enabled
+    OutputFormatter.print_command_verbose_info("generate chat",
+                                             profile=profile,
+                                             scope=scope,
+                                             file_path=file_path)
+    
     try:
         # Get the profile manager
         profile_manager = get_llm_profile_manager()
@@ -119,7 +144,7 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
             default_profile = profile_manager.get_default_profile()
             if not default_profile:
                 OutputFormatter.print_error("No LLM profile specified and no default profile set.")
-                OutputFormatter.print_info("Use: cli-tool llm create <name> --provider <provider> --model <model> --api-key <key> to create a profile")
+                OutputFormatter.print_info("Use: cli-tool llm create <n> --provider <provider> --model <model> --api-key <key> to create a profile")
                 OutputFormatter.print_info("Then use: cli-tool llm use <profile-name> to set it as default")
                 return
             profile = default_profile
@@ -175,7 +200,6 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
             print()  # Add final newline
             
             # Add assistant response to history
-            from langchain_core.messages import AIMessage
             messages.append(AIMessage(content=response_content))
             
     except ImportError as e:
@@ -183,6 +207,9 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
         OutputFormatter.print_info("Install LangChain with: pip install langchain-core langchain-openai")
     except Exception as e:
         OutputFormatter.print_error(f"Error: {str(e)}")
+    
+    # Print runtime settings at the end if verbose mode is enabled
+    OutputFormatter.end_command_with_runtime_settings(include_configs=False)
 
 # Export the command group
 generate_command = generate_group
