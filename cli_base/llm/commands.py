@@ -4,6 +4,8 @@ Provides commands for asking questions and engaging in chat sessions.
 """
 
 import click
+import readline
+import os
 from typing import Optional
 
 from cli_base.extensibility.llm_extension import get_llm_profile_manager
@@ -165,8 +167,40 @@ def chat_command(profile: Optional[str] = None, scope: Optional[str] = None, fil
         OutputFormatter.print_info("Starting chat session (press Ctrl+D or type 'exit' to end)")
         OutputFormatter.print_info("Model: " + profile_manager.get_profile(profile).get("model", "Unknown"))
         
+        # Set up readline with history file for input persistence
+        history_file = os.path.expanduser("~/.cli_tool_chat_history")
+        try:
+            # Create history file if it doesn't exist
+            if not os.path.exists(history_file):
+                with open(history_file, 'w') as f:
+                    pass
+                
+            # Load history from file
+            readline.read_history_file(history_file)
+            # Set history length
+            readline.set_history_length(1000)
+        except Exception as e:
+            # Handle potential readline errors gracefully
+            if verbose:
+                OutputFormatter.print_warning(f"Could not set up readline history: {str(e)}")
+        
+        # Set up tab completion
+        def complete(text, state):
+            # Simple completion of common commands
+            commands = ['exit', 'quit', 'bye', 'help', 'clear']
+            matches = [cmd for cmd in commands if cmd.startswith(text)]
+            return matches[state] if state < len(matches) else None
+            
+        readline.set_completer(complete)
+        readline.parse_and_bind("tab: complete")
+        
         # Keep track of messages for context
         messages = []
+        
+        # Display initial instruction
+        console.print("[dim]Type your messages below. Use arrow keys to navigate, Ctrl+A/E to jump to start/end.[/dim]")
+        console.print("[dim]Tab completion available for commands. History is saved between sessions.[/dim]")
+        console.print("[dim]Type 'exit', 'quit', or 'bye' to end the session.[/dim]")
         
         while True:
             # Get user input
@@ -174,12 +208,43 @@ def chat_command(profile: Optional[str] = None, scope: Optional[str] = None, fil
                 # Use Rich formatting for the prompt
                 console.print("\n[bold green]You[/bold green]", end="")
                 user_input = input("\n")
+                
+                # Add valid input to history
+                if user_input.strip() and user_input.lower() not in ['exit', 'quit', 'bye']:
+                    readline.add_history(user_input)
+                
                 if user_input.lower() in ["exit", "quit", "bye"]:
                     break
+                
+                # Special command: help
+                if user_input.lower() == "help":
+                    console.print("[dim]Commands:[/dim]")
+                    console.print("[dim]  help - Show this help message[/dim]")
+                    console.print("[dim]  exit/quit/bye - End the session[/dim]")
+                    console.print("[dim]  clear - Clear the screen[/dim]")
+                    console.print("[dim]Navigation:[/dim]")
+                    console.print("[dim]  Arrow keys - Navigate through text/history[/dim]")
+                    console.print("[dim]  Ctrl+A - Jump to start of line[/dim]")
+                    console.print("[dim]  Ctrl+E - Jump to end of line[/dim]")
+                    console.print("[dim]  Ctrl+L - Clear screen[/dim]")
+                    console.print("[dim]  Tab - Auto-complete commands[/dim]")
+                    continue
+                
+                # Special command: clear screen
+                if user_input.lower() == "clear":
+                    os.system('cls' if os.name == 'nt' else 'clear')
+                    continue
+                
             except (EOFError, KeyboardInterrupt):
                 console.print("\nExiting chat session.")
                 break
             
+            # Save history to file
+            try:
+                readline.write_history_file(history_file)
+            except Exception:
+                pass
+                
             # Add user message to history
             messages.append(HumanMessage(content=user_input))
             
