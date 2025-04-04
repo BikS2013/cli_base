@@ -1,6 +1,6 @@
 """
 LLM command module for using LLMs via the CLI.
-Provides commands for sending prompts and generating content.
+Provides commands for asking questions and engaging in chat sessions.
 """
 
 import click
@@ -9,38 +9,32 @@ from typing import Optional
 from cli_base.extensibility.llm_extension import get_llm_profile_manager
 from cli_base.utils.formatting import OutputFormatter, console
 from cli_base.utils.context import ContextManager, initialize_context
-from cli_base.utils.advanced_settings import get_parameter_value
-from cli_base.utils.param_resolver import with_resolved_params
-from cli_base.commands.cmd_options import scope_options, standard_command
+from cli_base.commands.cmd_options import scope_options
 from langchain_core.messages import HumanMessage, AIMessage
 
-@click.group("generate")
-def generate_group():
-    """Generate content using LLM models."""
-    pass
-
-@standard_command()
-@generate_group.command("prompt")
+@click.command("ask")
 @click.argument("prompt", type=str)
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
 @click.option("--stream/--no-stream", default=True, help="Stream the response (default: True)")
 @click.option("--max-tokens", type=int, help="Override max tokens for this request")
 @click.option("--temperature", type=float, help="Override temperature for this request")
-def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = True, 
-                   max_tokens: Optional[int] = None, temperature: Optional[float] = None,
-                   scope: Optional[str] = None, file_path: Optional[str] = None):
+@scope_options
+def ask_command(prompt: str, profile: Optional[str] = None, stream: bool = True, 
+               max_tokens: Optional[int] = None, temperature: Optional[float] = None,
+               scope: Optional[str] = None, file_path: Optional[str] = None):
     """
-    Generate a response from an LLM using the given prompt.
+    Ask a question to an LLM and get a response.
     
     Uses either the specified profile or the default profile.
     """
-    # Context is already initialized by standard_command
+    # Initialize context
+    ctx = ContextManager.initialize({"scope": scope, "file_path": file_path})
     
     # Detect verbose mode and set it
     verbose = OutputFormatter.detect_verbose_mode()
     
     # Print verbose information if enabled
-    OutputFormatter.print_command_verbose_info("generate prompt", 
+    OutputFormatter.print_command_verbose_info("ask", 
                                              prompt=prompt,
                                              profile=profile,
                                              stream=stream,
@@ -53,9 +47,7 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
         # Get the profile manager
         profile_manager = get_llm_profile_manager()
         
-        # Profile parameter is automatically resolved by @with_resolved_params
-        # If not provided, it will automatically use the default profile
-        
+        # If profile is not provided, use default
         if not profile:
             # Check if there's a default profile
             default_profile = profile_manager.get_default_profile()
@@ -116,25 +108,26 @@ def generate_prompt(prompt: str, profile: Optional[str] = None, stream: bool = T
     if verbose:
         OutputFormatter.end_command_with_runtime_settings(include_configs=False)
 
-@standard_command()
-@generate_group.command("chat")
+@click.command("chat")
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
-def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None, file_path: Optional[str] = None):
+@scope_options
+def chat_command(profile: Optional[str] = None, scope: Optional[str] = None, file_path: Optional[str] = None):
     """
     Start an interactive chat session with an LLM.
     
     Press Ctrl+D or type 'exit' to end the session.
     """
-    # Context is already initialized by standard_command
+    # Initialize context
+    ctx = ContextManager.initialize({"scope": scope, "file_path": file_path})
     
     # Detect verbose mode and set it
     verbose = OutputFormatter.detect_verbose_mode()
     
     # Print verbose information if enabled
-    OutputFormatter.print_command_verbose_info("generate chat",
-                                             profile=profile,
-                                             scope=scope,
-                                             file_path=file_path)
+    OutputFormatter.print_command_verbose_info("chat",
+                                           profile=profile,
+                                           scope=scope,
+                                           file_path=file_path)
     
     try:
         # Get the profile manager
@@ -215,6 +208,3 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
     # Print runtime settings at the end if verbose mode is enabled
     if verbose:
         OutputFormatter.end_command_with_runtime_settings(include_configs=False)
-
-# Export the command group
-generate_command = generate_group

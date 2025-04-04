@@ -12,9 +12,9 @@ from cli_base.commands.cmd_options import scope_options, standard_command
 from cli_base.utils.context import ContextManager
 from cli_base.utils.formatting import OutputFormatter
 
-# Import the generate command for LLM interaction
+# Import the LLM commands
 try:
-    from cli_base.llm.commands import generate_command
+    from cli_base.llm.commands import ask_command, chat_command
     HAS_LANGCHAIN = True
 except ImportError:
     HAS_LANGCHAIN = False
@@ -45,9 +45,10 @@ cli.add_command(llm_group)
 cli.add_command(schema_group)
 cli.add_command(advanced_command)
 
-# Add LLM generate command if LangChain is available
+# Add LLM commands if LangChain is available
 if HAS_LANGCHAIN:
-    cli.add_command(generate_command)
+    cli.add_command(ask_command)   # 'ask' command for one-off queries
+    cli.add_command(chat_command)  # 'chat' command for interactive sessions
 # Add other profile command groups here
 
 # Now register all commands in the CommandRegistry

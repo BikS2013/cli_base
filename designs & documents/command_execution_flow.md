@@ -1,6 +1,6 @@
 # Command Execution Flow
 
-This document explains the step-by-step execution flow when running a command like `cli-tool generate prompt "why is the sky blue?"`. It details which classes and objects are created and activated, and the sequence of method calls during command execution.
+This document explains the step-by-step execution flow when running a command like `cli-tool ask "why is the sky blue?"`. It details which classes and objects are created and activated, and the sequence of method calls during command execution.
 
 ## Execution Flow Overview
 
@@ -12,12 +12,12 @@ When you run a CLI command, the following high-level flow occurs:
 4. Command execution
 5. Result formatting and display
 
-## Detailed Flow for `generate prompt` Command
+## Detailed Flow for `ask` Command
 
 ### 1. Entry Point Initialization
 
 ```
-cli-tool generate prompt "why is the sky blue?"
+cli-tool ask "why is the sky blue?"
 ```
 
 1. The command starts at the entry point in `cli_base/main.py`
@@ -34,18 +34,15 @@ main.py:cli() -> [Click initialization]
 
 ### 2. Command Parsing and Routing
 
-1. Click identifies `generate` as a subcommand of the main CLI
-2. The `generate_group` Command Group (from `cli_base/llm/commands.py`) is activated
-3. Click identifies `prompt` as a subcommand of `generate`
-4. The `generate_prompt` function (from `cli_base/llm/commands.py`) is selected for execution
+1. Click identifies `ask` as a command of the main CLI
+2. The `ask_command` Command (from `cli_base/llm/commands.py`) is activated
 
 **Classes Activated:**
-- `click.Group` for the `generate` command group
-- `click.Command` for the `prompt` subcommand
+- `click.Command` for the `ask` command
 
 **Method Sequence:**
 ```
-main.py:cli() -> commands.py:generate_group() -> commands.py:generate_prompt()
+main.py:cli() -> commands.py:ask_command()
 ```
 
 ### 3. Configuration Loading and Context Setup
@@ -57,19 +54,18 @@ main.py:cli() -> commands.py:generate_group() -> commands.py:generate_prompt()
 
 **Classes and Objects Created:**
 - `ContextManager` singleton (from `cli_base/utils/context.py`)
-- `RTSettings` (from `cli_base/utils/rtsettings.py`)
+- `RTSettings` (from `cli_base/utils/advanced_settings.py`)
 - `ConfigManager` (from `cli_base/utils/config.py`) used internally by RTSettings
 
 **Method Sequence:**
 ```
-commands.py:generate_prompt() ->
-context.py:_initialize_context({scope, file_path}) ->
-  context.py:ContextManager.get_instance() or 
+commands.py:ask_command() ->
+context.py:initialize_context({scope, file_path}) ->
   context.py:ContextManager.initialize() ->
-    rtsettings.py:RTSettings.__init__() ->
-      rtsettings.py:RTSettings._initialize_config_files() ->
-      rtsettings.py:RTSettings._load_configurations() ->
-      rtsettings.py:RTSettings._build_runtime_context()
+    advanced_settings.py:AdvancedRTSettings.__init__() ->
+      advanced_settings.py:AdvancedRTSettings._initialize_config_files() ->
+      advanced_settings.py:AdvancedRTSettings._load_configurations() ->
+      advanced_settings.py:AdvancedRTSettings._build_runtime_context()
 ```
 
 ### 4. LLM Profile Management
@@ -87,15 +83,15 @@ context.py:_initialize_context({scope, file_path}) ->
 
 **Method Sequence:**
 ```
-commands.py:generate_prompt() ->
+commands.py:ask_command() ->
   llm_extension.py:get_llm_profile_manager() ->
     llm_extension.py:LLMProfileManager.__init__() 
   
   profiles.py:ProfileManager.get_default_profile() ->
-    rtsettings.py:RTSettings.get_default_profile_from_any_scope()
+    advanced_settings.py:AdvancedRTSettings.get_default_profile_from_any_scope()
     
   profiles.py:ProfileManager.get_profile() ->
-    rtsettings.py:RTSettings.get_profile_from_any_scope()
+    advanced_settings.py:AdvancedRTSettings.get_profile_from_any_scope()
     
   llm_extension.py:LLMProfileManager.get_llm() ->
     adapter.py:LLMAdapter.create_llm()
@@ -114,7 +110,7 @@ commands.py:generate_prompt() ->
 
 **Method Sequence:**
 ```
-commands.py:generate_prompt() ->
+commands.py:ask_command() ->
   adapter.py:LLMAdapter.create_llm() ->
     [LangChain specific model creation] ->
   
@@ -140,12 +136,12 @@ A critical part of command execution is loading the appropriate configuration ba
 
 **Method Sequence for Configuration Loading:**
 ```
-rtsettings.py:RTSettings._load_configurations() ->
+advanced_settings.py:AdvancedRTSettings._load_configurations() ->
   [Load global config] ->
   [Load local config] ->
   [Load file config if specified]
 
-rtsettings.py:RTSettings._build_runtime_context() ->
+advanced_settings.py:AdvancedRTSettings._build_runtime_context() ->
   [Deep merge configurations based on precedence rules]
 ```
 
@@ -161,7 +157,7 @@ When retrieving a profile (like an LLM profile), the system follows these steps:
 **Method Sequence for Profile Resolution:**
 ```
 profiles.py:ProfileManager.get_profile() ->
-  rtsettings.py:RTSettings.get_profile_from_any_scope() ->
+  advanced_settings.py:AdvancedRTSettings.get_profile_from_any_scope() ->
     [Try effective config] ->
     [Try local config if using --file] ->
     [Try global config] ->
@@ -178,7 +174,7 @@ If a profile cannot be found or there's an error during execution:
 
 **Method Sequence for Error Handling:**
 ```
-commands.py:generate_prompt() ->
+commands.py:ask_command() ->
   [Try to get profile] ->
   [Exception caught] ->
     OutputFormatter.print_error() ->
@@ -188,18 +184,17 @@ commands.py:generate_prompt() ->
 
 ## Complete Object Activation Sequence
 
-The complete sequence of classes being activated and objects being created during the execution of `cli-tool generate prompt "why is the sky blue?"` is:
+The complete sequence of classes being activated and objects being created during the execution of `cli-tool ask "why is the sky blue?"` is:
 
 1. `click.Group` (main CLI)
-2. `click.Group` (generate command group)
-3. `click.Command` (prompt subcommand)
-4. `ContextManager` (singleton)
-5. `RTSettings`
-6. `ConfigManager`
-7. `LLMProfileManager`
-8. `LLMAdapter`
-9. LangChain chat model (provider-specific)
-10. `HumanMessage`
-11. `OutputFormatter` (for results or errors)
+2. `click.Command` (ask command)
+3. `ContextManager` (singleton)
+4. `AdvancedRTSettings`
+5. `ConfigManager`
+6. `LLMProfileManager`
+7. `LLMAdapter`
+8. LangChain chat model (provider-specific)
+9. `HumanMessage`
+10. `OutputFormatter` (for results or errors)
 
 This sequence ensures that configuration is properly loaded, the correct profile is identified, and the LLM is initialized with the appropriate settings before processing the prompt and displaying the result.
