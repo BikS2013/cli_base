@@ -69,7 +69,20 @@ The tool supports three levels of configuration files:
 2. **Local**: Project-specific settings stored in `./.cli-tool/config.json`
 3. **Named**: User-specified configuration files at any location
 
-Configuration actions include:
+Configuration options can be used with any command:
+
+```bash
+# Use global scope with any command
+cli-tool [command] [subcommand] --global
+
+# Use local scope with any command (default)
+cli-tool [command] [subcommand] --local
+
+# Use named file with any command
+cli-tool [command] [subcommand] --file /path/to/config.json
+```
+
+Configuration management commands:
 
 ```bash
 # Show content of the local configuration file
@@ -80,6 +93,12 @@ cli-tool config save --global
 
 # Import configuration from another file
 cli-tool config import --from-file "~/my-configs/special.json" --to-local
+
+# Update configuration with current parameters
+cli-tool config update --global '{"settings": {"log_level": "debug"}}'
+
+# Enable verbose output to see runtime settings
+cli-tool -v config show
 ```
 
 ### LLM Profile Management
