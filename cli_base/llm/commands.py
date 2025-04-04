@@ -7,7 +7,7 @@ import click
 from typing import Optional
 
 from cli_base.extensibility.llm_extension import get_llm_profile_manager
-from cli_base.utils.formatting import OutputFormatter
+from cli_base.utils.formatting import OutputFormatter, console
 from cli_base.utils.context import ContextManager, initialize_context
 from cli_base.utils.advanced_settings import get_parameter_value
 from cli_base.utils.param_resolver import with_resolved_params
@@ -178,18 +178,21 @@ def interactive_chat(profile: Optional[str] = None, scope: Optional[str] = None,
         while True:
             # Get user input
             try:
-                user_input = click.prompt("\n[bold green]You[/bold green]", prompt_suffix="\n")
+                # Use Rich formatting for the prompt
+                console.print("\n[bold green]You[/bold green]", end="")
+                user_input = input("\n")
                 if user_input.lower() in ["exit", "quit", "bye"]:
                     break
             except (EOFError, KeyboardInterrupt):
-                click.echo("\nExiting chat session.")
+                console.print("\nExiting chat session.")
                 break
             
             # Add user message to history
             messages.append(HumanMessage(content=user_input))
             
-            # Print assistant response
-            click.echo("\n[bold blue]Assistant[/bold blue]")
+            # Print assistant response using Rich
+            console.print("\n[bold blue]Assistant[/bold blue]", end="")
+            console.print()  # Add a new line
             response_content = ""
             
             # Stream the response
