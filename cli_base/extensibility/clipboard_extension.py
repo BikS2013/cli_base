@@ -38,6 +38,9 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
     Uses a conversational approach that sends the entire content to the LLM and then 
     continuously asks for more output until the document is complete. This maintains full context 
     throughout the conversation and creates a coherent, well-structured document.
+    
+    Run with --verbose (-v) to see detailed output including the raw model responses
+    at each stage of processing.
     """
     # Initialize context
     ctx = ContextManager.initialize({"scope": scope, "file_path": file_path})
@@ -151,6 +154,13 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
                 messages.append(HumanMessage(content=filename_prompt))
                 first_response = llm.invoke(messages)
                 
+                # When verbose mode is enabled, output the raw model response
+                if verbose:
+                    OutputFormatter.print_verbose("Filename response from model:")
+                    OutputFormatter.print_verbose("-" * 40)
+                    OutputFormatter.print_verbose(first_response.content)
+                    OutputFormatter.print_verbose("-" * 40)
+                
                 # Extract filename
                 if "FILENAME:" in first_response.content[:200]:
                     lines = first_response.content.split('\n')
@@ -184,6 +194,17 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
             messages.append(HumanMessage(content=conversion_prompt))
             OutputFormatter.print_info("Starting markdown conversion...")
             response = llm.invoke(messages)
+            
+            # When verbose mode is enabled, output the raw model response
+            if verbose:
+                OutputFormatter.print_verbose("Initial conversion response from model:")
+                OutputFormatter.print_verbose("-" * 40)
+                # Show beginning of response if very long
+                preview_length = min(1000, len(response.content))
+                OutputFormatter.print_verbose(response.content[:preview_length])
+                if len(response.content) > preview_length:
+                    OutputFormatter.print_verbose("... (response truncated in verbose output)")
+                OutputFormatter.print_verbose("-" * 40)
             
             # Add model's response to conversation
             messages.append(response)
@@ -224,6 +245,17 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
                 OutputFormatter.print_info(f"Requesting continuation {continuation_count}...")
                 messages.append(HumanMessage(content=continuation_prompt))
                 response = llm.invoke(messages)
+                
+                # When verbose mode is enabled, output the raw model response
+                if verbose:
+                    OutputFormatter.print_verbose(f"Continuation {continuation_count} response:")
+                    OutputFormatter.print_verbose("-" * 40)
+                    # Show beginning of response if very long
+                    preview_length = min(500, len(response.content))
+                    OutputFormatter.print_verbose(response.content[:preview_length])
+                    if len(response.content) > preview_length:
+                        OutputFormatter.print_verbose("... (response truncated in verbose output)")
+                    OutputFormatter.print_verbose("-" * 40)
                 
                 # Add to result content
                 result_content += "\n\n" + response.content
@@ -268,6 +300,18 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
         
         OutputFormatter.print_info(f"Successfully saved to: {file_path}")
         OutputFormatter.print_info(f"Content length: {len(content)} characters")
+        
+        # Print additional information in verbose mode
+        if verbose:
+            OutputFormatter.print_verbose("Processing Summary:")
+            OutputFormatter.print_verbose(f"- Clipboard content size: {len(clipboard_content)} characters")
+            OutputFormatter.print_verbose(f"- Output content size: {len(content)} characters")
+            OutputFormatter.print_verbose(f"- Filename: {output_file}")
+            OutputFormatter.print_verbose(f"- Saved to: {file_path}")
+            if profile:
+                OutputFormatter.print_verbose(f"- Used LLM profile: {profile}")
+            else:
+                OutputFormatter.print_verbose(f"- Used default LLM profile")
             
     except ImportError as e:
         if "langchain" in str(e).lower():

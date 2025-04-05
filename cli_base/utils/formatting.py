@@ -64,6 +64,12 @@ class OutputFormatter:
     def print_info(message: str) -> None:
         """Print an informational message in blue."""
         console.print(f"[info]{message}[/info]")
+        
+    @classmethod
+    def print_verbose(cls, message: str) -> None:
+        """Print a verbose message when verbose mode is enabled."""
+        if cls.verbose_mode:
+            console.print(f"[dim]{message}[/dim]")
     
     @staticmethod
     def print_json(data: Dict[str, Any], title: Optional[str] = None) -> None:
