@@ -186,6 +186,9 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
             
             I will ask you to continue generating if your response is incomplete.
             
+            IMPORTANT: When you finish the conversion entirely, please explicitly state "CONVERSION COMPLETE" 
+            at the end of your response so I know you've processed everything.
+            
             Here is the content to convert:
             
             {content_to_process}
@@ -220,24 +223,41 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
             while continuation_count < max_continuations:
                 continuation_count += 1
                 
-                # Check if the response seems complete
-                last_paragraphs = response.content.strip().split('\n')[-3:]
+                # Check if the response seems complete using a more robust detection
+                last_paragraphs = response.content.strip().split('\n')[-5:]  # Check more lines
                 last_text = ' '.join(last_paragraphs).lower()
                 
-                # Detect completion signals
+                # Detect completion signals - more comprehensive list and check for variations
                 completion_markers = [
                     "that concludes", "in conclusion", "this completes", 
                     "end of document", "# conclusion", "## conclusion",
-                    "the end", "document end", "conversion complete"
+                    "the end", "document end", "conversion complete", "is complete",
+                    "has been completed", "is now complete", "complete.", "completed.", 
+                    "conversion is complete", "fully converted", "fully formatted",
+                    "finished", "all content has been", "all sections", 
+                    "all provided content", "complete conversion"
                 ]
                 
+                # First, check for exact matches
                 if any(marker in last_text for marker in completion_markers):
+                    OutputFormatter.print_info("Detected completion marker. Conversion finished.")
+                    break
+                    
+                # Second, check for our explicit uppercase marker
+                if "CONVERSION COMPLETE" in response.content:
+                    OutputFormatter.print_info("Explicit completion marker found. Conversion finished.")
+                    break
+                
+                # Third, check if "complete" appears with other keywords close by
+                if "complete" in last_text and any(word in last_text for word in ["conversion", "all", "is", "now", "fully"]):
                     OutputFormatter.print_info("Conversion appears complete.")
                     break
                 
                 # Ask model to continue
                 continuation_prompt = f"""
-                Please continue where you left off. If you have completed the conversion, please say so explicitly.
+                Please continue where you left off. 
+                
+                IMPORTANT: If you've completed the conversion, say "CONVERSION COMPLETE" explicitly.
                 
                 Remember to maintain the same formatting style and structure you established earlier.
                 """
