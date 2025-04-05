@@ -22,20 +22,22 @@ from langchain_core.messages import HumanMessage
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
 @click.option("--max-tokens", type=int, help="Override max tokens for this request")
 @click.option("--temperature", type=float, help="Override temperature for this request")
-@click.option("--chunk-size", type=int, default=5000, help="Break input into chunks of this size for large content")
+@click.option("--max-continuations", type=int, default=10, help="Maximum number of continuations to request")
 @scope_options
 def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = None, output: Optional[str] = None,
                            profile: Optional[str] = None, max_tokens: Optional[int] = None, 
-                           temperature: Optional[float] = None, chunk_size: int = 5000,
+                           temperature: Optional[float] = None, max_continuations: int = 10,
                            scope: Optional[str] = None, file_path: Optional[str] = None):
     """
-    Convert clipboard content to a markup file using an LLM.
+    Convert clipboard content to a markdown file using an LLM.
     
-    Reads content from the clipboard, asks an LLM to convert it to appropriate markup,
+    Reads content from the clipboard, asks an LLM to convert it to well-formatted markdown,
     and saves the result to a file. If no folder is specified, the current folder is used.
     If no filename is specified (via --file or --output), the LLM will suggest an appropriate filename.
     
-    For large clipboard content, the command will process it in chunks to avoid token limits.
+    Uses a conversational approach that sends the entire content to the LLM and then 
+    continuously asks for more output until the document is complete. This maintains full context 
+    throughout the conversation and creates a coherent, well-structured document.
     """
     # Initialize context
     ctx = ContextManager.initialize({"scope": scope, "file_path": file_path})
@@ -47,13 +49,13 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
     output_file = file or output
     
     # Print verbose information if enabled
-    OutputFormatter.print_command_verbose_info("from-clipboard",
+    OutputFormatter.print_command_verbose_info("get-clipboard",
                                              folder=folder,
                                              output=output_file,
                                              profile=profile,
                                              max_tokens=max_tokens,
                                              temperature=temperature,
-                                             chunk_size=chunk_size,
+                                             max_continuations=max_continuations,
                                              scope=scope,
                                              file_path=file_path)
     
@@ -122,88 +124,122 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
             # Create folder if it doesn't exist
             os.makedirs(folder, exist_ok=True)
             
-        # Function to process content in chunks if needed
+        # Function to process content using continuous generation approach
         def process_with_llm(content_to_process, need_filename=False):
-            # For large content, determine if we need to chunk
             content_length = len(content_to_process)
+            OutputFormatter.print_info(f"Processing content ({content_length} characters)...")
             
-            if content_length > chunk_size:
-                OutputFormatter.print_info(f"Content is large ({content_length} chars), processing in chunks...")
-                
-                # First, process a small piece to get the filename if needed
-                first_chunk = content_to_process[:min(1000, content_length)]
+            # Initialize conversation
+            messages = []
+            
+            # Step 1: Determine filename if needed
+            suggested_filename = None
+            if need_filename:
                 filename_prompt = f"""
-                I have raw content that needs to be converted to a well-formatted markup document.
-                This is just a sample of the beginning of the content for you to understand its nature.
+                You are tasked with converting raw text into well-formatted markdown.
                 
-                {'Please suggest an appropriate filename for this content at the beginning of your response in the format FILENAME: example.md' if need_filename else ''}
+                First, analyze this content and suggest an appropriate descriptive filename.
+                Respond with a line starting with "FILENAME:" followed by your suggestion (e.g., "FILENAME: project-overview.md").
                 
-                Here's the beginning of the content:
-                {first_chunk}
-                """
-                
-                # Get filename from first chunk if needed
-                if need_filename:
-                    first_response = llm.invoke([HumanMessage(content=filename_prompt)])
-                    suggested_filename = None
-                    
-                    # Extract filename
-                    if "FILENAME:" in first_response.content[:200]:
-                        lines = first_response.content.split('\n')
-                        for line in lines[:3]:
-                            if "FILENAME:" in line:
-                                suggested_filename = line.split('FILENAME:')[1].strip()
-                                break
-                
-                # Process content in chunks
-                chunks = [content_to_process[i:i+chunk_size] for i in range(0, content_length, chunk_size)]
-                full_result = ""
-                
-                for i, chunk in enumerate(chunks):
-                    chunk_prompt = f"""
-                    This is chunk {i+1} of {len(chunks)} from a larger document that needs to be converted to markup.
-                    {'You already suggested a filename in an earlier chunk, so no need to do that again.' if need_filename and i > 0 else ''}
-                    
-                    Please convert ONLY this chunk to appropriate markup format. I will combine all chunks later.
-                    
-                    Here's the content for this chunk:
-                    {chunk}
-                    """
-                    
-                    OutputFormatter.print_info(f"Processing chunk {i+1}/{len(chunks)}...")
-                    chunk_response = llm.invoke([HumanMessage(content=chunk_prompt)])
-                    full_result += chunk_response.content + "\n\n"
-                
-                return full_result, suggested_filename if need_filename else None
-            else:
-                # Process content normally for smaller content
-                prompt = f"""
-                I have raw content that needs to be converted to a well-formatted markup document.
-                Please convert this content to the most appropriate markup format (Markdown, reStructuredText, etc.)
-                based on the content type. Ensure proper headings, lists, and formatting are applied.
-                
-                {'' if not need_filename else 'Also, suggest an appropriate filename for this content at the beginning of your response in the format FILENAME: example.md'}
+                After suggesting the filename, explain in 1-2 sentences why you chose it, but DO NOT start any conversion yet.
                 
                 Here's the content:
-                {content_to_process}
+                {content_to_process[:min(2000, content_length)]}
                 """
                 
-                # Get response
-                response = llm.invoke([HumanMessage(content=prompt)])
-                result_content = response.content
+                OutputFormatter.print_info("Determining appropriate filename...")
+                messages.append(HumanMessage(content=filename_prompt))
+                first_response = llm.invoke(messages)
                 
-                # Extract filename if requested
-                suggested_filename = None
-                if need_filename and "FILENAME:" in result_content[:200]:
-                    lines = result_content.split('\n')
-                    for line in lines[:3]:  # Check first few lines
+                # Extract filename
+                if "FILENAME:" in first_response.content[:200]:
+                    lines = first_response.content.split('\n')
+                    for line in lines[:3]:
                         if "FILENAME:" in line:
                             suggested_filename = line.split('FILENAME:')[1].strip()
-                            # Remove the filename line from the content
-                            result_content = '\n'.join([l for l in lines if "FILENAME:" not in l])
+                            OutputFormatter.print_info(f"Suggested filename: {suggested_filename}")
                             break
                 
-                return result_content, suggested_filename
+                # Add model's response to conversation
+                messages.append(first_response)
+            
+            # Step 2: Start conversion process - always with the full content
+            conversion_prompt = f"""
+            Now I need you to convert the following content into well-formatted markdown.
+            
+            Guidelines:
+            - Analyze the content carefully to determine its structure and purpose
+            - Use appropriate headings, lists, tables, and formatting
+            - Maintain the original information and hierarchy
+            - Add appropriate markup like bold, italic, code blocks, etc. where it makes sense
+            - Create a clean, professional document that preserves all important content
+            
+            I will ask you to continue generating if your response is incomplete.
+            
+            Here is the content to convert:
+            
+            {content_to_process}
+            """
+            
+            messages.append(HumanMessage(content=conversion_prompt))
+            OutputFormatter.print_info("Starting markdown conversion...")
+            response = llm.invoke(messages)
+            
+            # Add model's response to conversation
+            messages.append(response)
+            
+            # Initialize result content
+            result_content = response.content
+            
+            # Step 3: Continue asking for more until the model indicates it's finished
+            # We'll use a continuation counter and watch for signs of completion
+            continuation_count = 0
+            # Use the provided max_continuations parameter
+            
+            while continuation_count < max_continuations:
+                continuation_count += 1
+                
+                # Check if the response seems complete
+                last_paragraphs = response.content.strip().split('\n')[-3:]
+                last_text = ' '.join(last_paragraphs).lower()
+                
+                # Detect completion signals
+                completion_markers = [
+                    "that concludes", "in conclusion", "this completes", 
+                    "end of document", "# conclusion", "## conclusion",
+                    "the end", "document end", "conversion complete"
+                ]
+                
+                if any(marker in last_text for marker in completion_markers):
+                    OutputFormatter.print_info("Conversion appears complete.")
+                    break
+                
+                # Ask model to continue
+                continuation_prompt = f"""
+                Please continue where you left off. If you have completed the conversion, please say so explicitly.
+                
+                Remember to maintain the same formatting style and structure you established earlier.
+                """
+                
+                OutputFormatter.print_info(f"Requesting continuation {continuation_count}...")
+                messages.append(HumanMessage(content=continuation_prompt))
+                response = llm.invoke(messages)
+                
+                # Add to result content
+                result_content += "\n\n" + response.content
+                
+                # Add model's response to conversation
+                messages.append(response)
+                
+                # Manage conversation length - keep only recent messages
+                if len(messages) > 6:
+                    # Keep the first message (context) and the most recent exchanges
+                    messages = [messages[0]] + messages[-5:]
+            
+            if continuation_count >= max_continuations:
+                OutputFormatter.print_info("Reached maximum continuations - finalizing document.")
+            
+            return result_content, suggested_filename
         
         OutputFormatter.print_info("Processing clipboard content with LLM...\n")
         
