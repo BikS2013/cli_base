@@ -48,8 +48,22 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
     # Detect verbose mode and set it
     verbose = OutputFormatter.detect_verbose_mode()
     
+    # Initialize context and get command config
+    rt_settings = ctx.settings
+    cmd_config = rt_settings.get_command_config("get-clipboard")
+    
     # Combine file and output parameters (output is an alias for file)
     output_file = file or output
+    
+    # Get config defaults if parameters not specified
+    if not profile:
+        profile = cmd_config.get("profile")
+    if max_tokens is None and "max_tokens" in cmd_config:
+        max_tokens = cmd_config.get("max_tokens")
+    if temperature is None and "temperature" in cmd_config:
+        temperature = cmd_config.get("temperature")
+    if max_continuations == 10 and "max_continuations" in cmd_config:
+        max_continuations = cmd_config.get("max_continuations")
     
     # Print verbose information if enabled
     OutputFormatter.print_command_verbose_info("get-clipboard",
@@ -61,6 +75,11 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
                                              max_continuations=max_continuations,
                                              scope=scope,
                                              file_path=file_path)
+                                             
+    if verbose and cmd_config:
+        OutputFormatter.print_verbose("Using command config:")
+        for key, value in cmd_config.items():
+            OutputFormatter.print_verbose(f"  {key}: {value}")
     
     try:
         # Import pyperclip here to avoid import errors at module level
@@ -120,12 +139,15 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
             OutputFormatter.print_error(f"Could not read clipboard: {str(e)}")
             return
         
-        # Set folder to current directory if not specified
+        # If folder not specified, check for it in command config first, then default to current directory
+        rt_settings = ctx.settings
+        cmd_config = rt_settings.get_command_config("get-clipboard")
+
         if not folder:
-            folder = os.getcwd()
-        else:
-            # Create folder if it doesn't exist
-            os.makedirs(folder, exist_ok=True)
+            folder = cmd_config.get("folder", os.getcwd())
+        
+        # Create folder if it doesn't exist
+        os.makedirs(folder, exist_ok=True)
             
         # Function to process content using continuous generation approach
         def process_with_llm(content_to_process, need_filename=False):

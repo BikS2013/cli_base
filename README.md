@@ -75,6 +75,35 @@ cli-tool config update --global '{"settings": {"log_level": "debug"}}'
 cli-tool -v config show
 ```
 
+#### Command-Specific Configuration
+
+You can set default values for specific commands that will be used when not explicitly provided:
+
+```bash
+# Set default folder for get-clipboard command
+cli-tool config command-set get-clipboard '{"folder": "./output"}'
+
+# Show command-specific configuration
+cli-tool config command-show get-clipboard
+
+# Use global scope for command config
+cli-tool config command-set get-clipboard '{"profile": "chatgpt-4"}' --global
+```
+
+Example of command-specific configuration in config.json:
+```json
+{
+  "commands": {
+    "get-clipboard": {
+      "folder": "./output",
+      "max_continuations": 15
+    }
+  }
+}
+```
+
+When you run a command without specifying certain parameters, the tool will check the configuration file for command-specific defaults before using global defaults.
+
 ### LLM Profile Management
 
 Create and manage LLM profiles with support for multiple providers through LangChain:

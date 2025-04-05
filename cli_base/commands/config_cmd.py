@@ -249,6 +249,129 @@ def reset_config(scope: str, file_path: Optional[str] = None):
 
 
 @standard_command()
+@config_group.command(name="command-show")
+@click.argument("command_path", required=True)
+def show_command_config(command_path: str, scope: Optional[str] = None, file_path: Optional[str] = None):
+    """
+    Display command-specific configuration settings.
+    
+    COMMAND_PATH: The path to the command (e.g., "get-clipboard")
+    """
+    # Context is already initialized by standard_command
+    # Get context and settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
+    
+    # Detect verbose mode and set it
+    verbose = OutputFormatter.detect_verbose_mode()
+    
+    # Print verbose information if enabled
+    OutputFormatter.print_command_verbose_info("config command-show", 
+                                             command_path=command_path,
+                                             scope=scope, 
+                                             file_path=file_path)
+    
+    try:
+        # Get effective config for all scopes
+        effective_config = rt.get_effective_config()
+        
+        if "commands" not in effective_config or command_path not in effective_config.get("commands", {}):
+            OutputFormatter.print_info(f"No configuration found for command: {command_path}")
+            return
+            
+        command_config = effective_config["commands"][command_path]
+        OutputFormatter.print_json(command_config, f"Configuration for command: {command_path}")
+        
+        # Show which scopes have configs for this command
+        if verbose:
+            # Check global config
+            global_has_command = (
+                "commands" in rt.global_config and 
+                command_path in rt.global_config.get("commands", {})
+            )
+            
+            # Check local config
+            local_has_command = (
+                "commands" in rt.local_config and 
+                command_path in rt.local_config.get("commands", {})
+            )
+            
+            # Check named config
+            named_has_command = False
+            if rt.named_config:
+                named_has_command = (
+                    "commands" in rt.named_config and 
+                    command_path in rt.named_config.get("commands", {})
+                )
+            
+            OutputFormatter.print_verbose("Command config found in:")
+            if global_has_command:
+                OutputFormatter.print_verbose("  - Global config")
+            if local_has_command:
+                OutputFormatter.print_verbose("  - Local config")
+            if named_has_command:
+                OutputFormatter.print_verbose("  - Named config")
+    except (ValueError, IOError) as e:
+        OutputFormatter.print_error(str(e))
+    
+    # Print runtime settings at the end if verbose mode is enabled
+    OutputFormatter.end_command_with_runtime_settings(include_configs=False)
+
+
+@standard_command()
+@config_group.command(name="command-set")
+@click.argument("command_path", required=True)
+@click.argument("settings_json", required=True)
+def set_command_config(command_path: str, settings_json: str, scope: Optional[str] = None, file_path: Optional[str] = None):
+    """
+    Set command-specific configuration settings.
+    
+    COMMAND_PATH: The path to the command (e.g., "get-clipboard")
+    SETTINGS_JSON: JSON string with command settings
+    
+    Example:
+        cli-tool config command-set get-clipboard '{"folder": "./output"}'
+    """
+    # Context is already initialized by standard_command
+    # Get context and settings
+    ctx = ContextManager.get_instance()
+    rt = ctx.settings
+    
+    # Detect verbose mode and set it
+    verbose = OutputFormatter.detect_verbose_mode()
+    
+    # Print verbose information if enabled
+    OutputFormatter.print_command_verbose_info("config command-set", 
+                                             command_path=command_path,
+                                             settings_json=settings_json,
+                                             scope=scope, 
+                                             file_path=file_path)
+    
+    try:
+        # Parse the settings JSON
+        try:
+            settings = json.loads(settings_json)
+        except json.JSONDecodeError:
+            OutputFormatter.print_error("Invalid JSON format for settings.")
+            return
+            
+        # Validate scope + file_path combination
+        if scope is None and file_path is None:
+            scope = "local"  # Default to local if not specified
+        elif scope is None and file_path is not None:
+            scope = "file"
+            
+        # Update command configuration
+        rt.set_command_config(command_path, settings, scope)
+        OutputFormatter.print_success(f"Command configuration set in {scope} config.")
+    except (ValueError, IOError) as e:
+        OutputFormatter.print_error(str(e))
+    
+    # Print runtime settings at the end if verbose mode is enabled
+    OutputFormatter.end_command_with_runtime_settings(include_configs=False)
+
+
+@standard_command()
 @config_group.command(name="generate")
 def generate_config(scope: str, file_path: Optional[str] = None):
     """Generate command-line instructions based on configuration."""
