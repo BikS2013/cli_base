@@ -146,8 +146,19 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
         if not folder:
             folder = cmd_config.get("folder", os.getcwd())
         
+        # Expand any ~ or environment variables in the folder path
+        folder = os.path.expanduser(folder)
+        folder = os.path.expandvars(folder)
+        
+        # Convert to absolute path if it's a relative path
+        if not os.path.isabs(folder):
+            folder = os.path.abspath(folder)
+            
         # Create folder if it doesn't exist
         os.makedirs(folder, exist_ok=True)
+        
+        if verbose:
+            OutputFormatter.print_verbose(f"Using folder: {folder}")
             
         # Function to process content using continuous generation approach
         def process_with_llm(content_to_process, need_filename=False):
@@ -333,8 +344,26 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
         if '.' not in output_file:
             output_file = f"{output_file}.md"
         
-        # Create full file path
-        file_path = os.path.join(folder, output_file)
+        # Handle output filename - if it contains a path, handle it appropriately
+        if os.path.dirname(output_file):
+            # If output_file contains a path, expand and resolve it
+            output_dir = os.path.dirname(output_file)
+            output_dir = os.path.expanduser(output_dir)
+            output_dir = os.path.expandvars(output_dir)
+            
+            # If it's an absolute path, use it directly
+            if os.path.isabs(output_dir):
+                # Create the directory
+                os.makedirs(output_dir, exist_ok=True)
+                file_path = os.path.expanduser(output_file)
+            else:
+                # It's a relative path, combine with the folder
+                output_dir = os.path.join(folder, output_dir)
+                os.makedirs(output_dir, exist_ok=True)
+                file_path = os.path.join(folder, output_file)
+        else:
+            # No path in the output_file, just use the folder
+            file_path = os.path.join(folder, output_file)
         
         # Save content to file
         with open(file_path, 'w') as f:
@@ -342,6 +371,9 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
         
         OutputFormatter.print_info(f"Successfully saved to: {file_path}")
         OutputFormatter.print_info(f"Content length: {len(content)} characters")
+        
+        if verbose:
+            OutputFormatter.print_verbose(f"Full save path: {os.path.abspath(file_path)}")
         
         # Print additional information in verbose mode
         if verbose:
