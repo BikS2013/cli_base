@@ -8,6 +8,7 @@ Requires-Dist: python-dotenv>=1.0.1
 Requires-Dist: click>=8.1.7
 Requires-Dist: rich>=13.7.0
 Requires-Dist: pyyaml>=6.0.1
+Requires-Dist: pyperclip>=1.8.2
 Requires-Dist: langchain-core>=0.1.0
 Requires-Dist: langchain-openai>=0.0.5
 Requires-Dist: langchain-anthropic>=0.1.1
@@ -100,6 +101,35 @@ cli-tool config update --global '{"settings": {"log_level": "debug"}}'
 # Enable verbose output to see runtime settings
 cli-tool -v config show
 ```
+
+#### Command-Specific Configuration
+
+You can set default values for specific commands that will be used when not explicitly provided:
+
+```bash
+# Set default folder for get-clipboard command
+cli-tool config command-set get-clipboard '{"folder": "./output"}'
+
+# Show command-specific configuration
+cli-tool config command-show get-clipboard
+
+# Use global scope for command config
+cli-tool config command-set get-clipboard '{"profile": "chatgpt-4"}' --global
+```
+
+Example of command-specific configuration in config.json:
+```json
+{
+  "commands": {
+    "get-clipboard": {
+      "folder": "./output",
+      "max_continuations": 15
+    }
+  }
+}
+```
+
+When you run a command without specifying certain parameters, the tool will check the configuration file for command-specific defaults before using global defaults.
 
 ### LLM Profile Management
 
