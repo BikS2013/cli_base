@@ -10,6 +10,8 @@ dependencies = [
     "rich>=13.7.0",
     "pyyaml>=6.0.1",
     "pyperclip>=1.8.2",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.2",
     # LangChain dependencies
     "langchain-core>=0.1.0",
     "langchain-openai>=0.0.5",

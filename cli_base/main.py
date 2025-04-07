@@ -15,7 +15,7 @@ from cli_base.utils.formatting import OutputFormatter
 # Import the LLM commands
 try:
     from cli_base.llm.commands import ask_command, chat_command
-    from cli_base.extensibility.clipboard_extension import get_clipboard_command
+    from cli_base.extensibility import get_clipboard_command, get_page_command
     HAS_LANGCHAIN = True
 except ImportError:
     HAS_LANGCHAIN = False
@@ -51,6 +51,7 @@ if HAS_LANGCHAIN:
     cli.add_command(ask_command)          # 'ask' command for one-off queries
     cli.add_command(chat_command)         # 'chat' command for interactive sessions
     cli.add_command(get_clipboard_command)  # 'get-clipboard' command to convert clipboard content
+    cli.add_command(get_page_command)     # 'get-page' command to convert web page content
 # Add other profile command groups here
 
 # Now register all commands in the CommandRegistry

@@ -34,6 +34,8 @@ cli-tool [COMMAND] [SUBCOMMAND] [OPTIONS] [FLAGS]
 - `llm`: Manage LLM profiles
 - `schema`: Display command structure as ASCII art
 - `help`: Display help information
+- `get-clipboard`: Convert clipboard content to markdown file
+- `get-page`: Convert web page content to markdown file
 
 ### Configuration Management
 
@@ -83,11 +85,16 @@ You can set default values for specific commands that will be used when not expl
 # Set default folder for get-clipboard command
 cli-tool config command-set get-clipboard '{"folder": "./output"}'
 
+# Set default profile for get-page command
+cli-tool config command-set get-page '{"profile": "chatgpt-4"}'
+
 # Show command-specific configuration
 cli-tool config command-show get-clipboard
+cli-tool config command-show get-page
 
 # Use global scope for command config
 cli-tool config command-set get-clipboard '{"profile": "chatgpt-4"}' --global
+cli-tool config command-set get-page '{"profile": "claude-3"}' --global
 ```
 
 Example of command-specific configuration in config.json:
@@ -97,6 +104,11 @@ Example of command-specific configuration in config.json:
     "get-clipboard": {
       "folder": "./output",
       "max_continuations": 15
+    },
+    "get-page": {
+      "folder": "./web-pages",
+      "profile": "claude-3",
+      "max_continuations": 20
     }
   }
 }
@@ -107,6 +119,29 @@ When you run a command without specifying certain parameters, the tool will chec
 ### LLM Profile Management
 
 Create and manage LLM profiles with support for multiple providers through LangChain:
+
+### Web Page and Clipboard Commands
+
+The CLI tool provides powerful commands for converting content to markdown files:
+
+```bash
+# Convert web page to markdown
+cli-tool get-page --url "https://example.com" --folder "./pages"
+
+# Convert web page with specific LLM profile
+cli-tool get-page --url "https://example.com" --profile "claude-3"
+
+# Convert web page with custom output filename
+cli-tool get-page --url "https://example.com" --output "example-page.md"
+
+# Convert clipboard content to markdown
+cli-tool get-clipboard --folder "./notes"
+
+# Use verbose output for detailed processing logs
+cli-tool -v get-page --url "https://example.com"
+```
+
+### LLM Profile Management
 
 ```bash
 # Create a new LLM profile

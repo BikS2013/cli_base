@@ -1,6 +1,6 @@
 """
-Clipboard extension for CLI tool.
-Provides the get-clipboard command for converting clipboard content to formatted files.
+Webpage extension for CLI tool.
+Provides the get-page command for converting web page content to formatted markdown files.
 """
 
 import click
@@ -13,7 +13,8 @@ from cli_base.commands.cmd_options import scope_options
 from cli_base.extensibility.content_processor import ContentProcessor
 
 
-@click.command("get-clipboard")
+@click.command("get-page")
+@click.option("--url", required=True, help="URL of the web page to fetch and process")
 @click.option("--folder", "-f", help="Folder where to save the file (uses current folder if not specified)")
 @click.option("--file", "--output", "-o", help="Name of the file to save (LLM will decide if not specified)")
 @click.option("--profile", "-p", help="LLM profile to use (uses default if not specified)")
@@ -21,14 +22,14 @@ from cli_base.extensibility.content_processor import ContentProcessor
 @click.option("--temperature", type=float, help="Override temperature for this request")
 @click.option("--max-continuations", type=int, default=10, help="Maximum number of continuations to request")
 @scope_options
-def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = None, output: Optional[str] = None,
-                           profile: Optional[str] = None, max_tokens: Optional[int] = None, 
-                           temperature: Optional[float] = None, max_continuations: int = 10,
-                           scope: Optional[str] = None, file_path: Optional[str] = None):
+def get_page_command(url: str, folder: Optional[str] = None, file: Optional[str] = None, output: Optional[str] = None,
+                     profile: Optional[str] = None, max_tokens: Optional[int] = None, 
+                     temperature: Optional[float] = None, max_continuations: int = 10,
+                     scope: Optional[str] = None, file_path: Optional[str] = None):
     """
-    Convert clipboard content to a markdown file using an LLM.
+    Convert web page content to a markdown file using an LLM.
     
-    Reads content from the clipboard, asks an LLM to convert it to well-formatted markdown,
+    Fetches content from the specified URL, asks an LLM to convert it to well-formatted markdown,
     and saves the result to a file. If no folder is specified, the current folder is used.
     If no filename is specified (via --file or --output), the LLM will suggest an appropriate filename.
     
@@ -47,7 +48,7 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
     
     # Initialize context and get command config
     rt_settings = ctx.settings
-    cmd_config = rt_settings.get_command_config("get-clipboard")
+    cmd_config = rt_settings.get_command_config("get-page")
     
     # Combine file and output parameters (output is an alias for file)
     output_file = file or output
@@ -63,43 +64,73 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
         max_continuations = cmd_config.get("max_continuations")
     
     # Print verbose information if enabled
-    OutputFormatter.print_command_verbose_info("get-clipboard",
-                                          folder=folder,
-                                          output=output_file,
-                                          profile=profile,
-                                          max_tokens=max_tokens,
-                                          temperature=temperature,
-                                          max_continuations=max_continuations,
-                                          scope=scope,
-                                          file_path=file_path)
-                                         
+    OutputFormatter.print_command_verbose_info("get-page",
+                                           url=url,
+                                           folder=folder,
+                                           output=output_file,
+                                           profile=profile,
+                                           max_tokens=max_tokens,
+                                           temperature=temperature,
+                                           max_continuations=max_continuations,
+                                           scope=scope,
+                                           file_path=file_path)
+                                           
     if verbose and cmd_config:
         OutputFormatter.print_verbose("Using command config:")
         for key, value in cmd_config.items():
             OutputFormatter.print_verbose(f"  {key}: {value}")
     
     try:
-        # Import pyperclip here to avoid import errors at module level
+        # Import required libraries
         try:
-            import pyperclip
-        except ImportError:
-            OutputFormatter.print_error("Pyperclip not installed. Please install it with: pip install pyperclip")
+            import requests
+            from bs4 import BeautifulSoup
+        except ImportError as e:
+            if "requests" in str(e):
+                OutputFormatter.print_error("Requests not installed. Please install it with: pip install requests")
+            elif "bs4" in str(e):
+                OutputFormatter.print_error("BeautifulSoup not installed. Please install it with: pip install beautifulsoup4")
+            else:
+                OutputFormatter.print_error(f"Required library not installed: {str(e)}")
             return
         
-        # Get clipboard content
+        # Fetch web page content
         try:
-            clipboard_content = pyperclip.paste()
-            if not clipboard_content:
-                OutputFormatter.print_error("Clipboard is empty. Copy some content first.")
+            OutputFormatter.print_info(f"Fetching content from URL: {url}")
+            response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            response.raise_for_status()  # Raise exception for 4XX/5XX responses
+            
+            # Parse HTML content
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract main content (strip scripts, styles, etc.)
+            for script in soup(["script", "style", "meta", "noscript", "iframe"]):
+                script.extract()
+            
+            # Get the page content
+            web_content = soup.get_text(separator=' ', strip=True)
+            
+            if not web_content:
+                OutputFormatter.print_error("Could not extract meaningful content from the webpage.")
                 return
-            OutputFormatter.print_info(f"Found {len(clipboard_content)} characters in clipboard")
-        except Exception as e:
-            OutputFormatter.print_error(f"Could not read clipboard: {str(e)}")
+            
+            OutputFormatter.print_info(f"Found {len(web_content)} characters of content")
+            
+            # Add the page title if available
+            page_title = soup.title.string if soup.title else "Unknown Page"
+            if verbose:
+                OutputFormatter.print_verbose(f"Page title: {page_title}")
+            
+        except requests.exceptions.RequestException as e:
+            OutputFormatter.print_error(f"Error fetching web page: {str(e)}")
             return
-        
+        except Exception as e:
+            OutputFormatter.print_error(f"Error processing web page content: {str(e)}")
+            return
+            
         # Create the content processor
         processor = ContentProcessor(
-            command_name="get-clipboard",
+            command_name="get-page",
             profile=profile,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -109,23 +140,25 @@ def get_clipboard_command(folder: Optional[str] = None, file: Optional[str] = No
         )
         
         # Get the folder to save to
-        folder = ContentProcessor.get_folder_from_config("get-clipboard", folder, ctx)
+        folder = ContentProcessor.get_folder_from_config("get-page", folder, ctx)
         
         # Process the content
-        OutputFormatter.print_info("Processing clipboard content with LLM...\n")
+        OutputFormatter.print_info("Processing web page content with LLM...\n")
         
-        # Create metadata dictionary
+        # Create metadata dictionary with web page specific information
         metadata = {
-            "source_type": "clipboard"
+            "source_type": "webpage",
+            "url": url,
+            "title": page_title
         }
         
         # Process content and save to file
         success = processor.process_content_to_markdown(
-            content=clipboard_content,
+            content=web_content,
             folder=folder,
             output_file=output_file,
             metadata=metadata,
-            default_prefix="document"
+            default_prefix="webpage"
         )
         
         if not success:

@@ -19,6 +19,7 @@ cli_base/extensibility/__init__.py
 cli_base/extensibility/clipboard_extension.py
 cli_base/extensibility/generator.py
 cli_base/extensibility/llm_extension.py
+cli_base/extensibility/webpage_extension.py
 cli_base/llm/__init__.py
 cli_base/llm/adapter.py
 cli_base/llm/commands.py
